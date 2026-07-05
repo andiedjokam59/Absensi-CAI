@@ -374,10 +374,12 @@
             modal.classList.add('success-status');
             iconContainer.innerHTML = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
             titleContainer.style.color = "#1d4ed8";
+            bunyikanSuaraSukses();
         } else {
             modal.classList.add('error-status');
             iconContainer.innerHTML = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
             titleContainer.style.color = "#ef4444";
+            bunyikanSuaraGagal();
         }
 
         titleContainer.innerText = judul;
@@ -487,7 +489,7 @@
                 let { data: cloudLogs } = await _supabase
                     .from('absensi_cai')
                     .select('created_at')
-                    .eq('id_peserta', idPeserta); // FIX: Menggunakan id_peserta sesuai kolom database
+                    .eq('id_peserta', idPeserta); 
                 if (cloudLogs) riwayatGabungan = riwayatGabungan.concat(cloudLogs);
             } catch(e) {}
         }
@@ -499,14 +501,12 @@
         if (logTerakhirSama) {
             let selisihJam = (waktuSekarang - new Date(logTerakhirSama.created_at)) / (1000 * 60 * 60);
             if (selisihJam < 3) {
-                bunyikanSuaraGagal(); 
                 let sisaMenit = Math.ceil((3 - selisihJam) * 60);
                 tampilkanNotifKustom('error', 'Sudah Absen', `${profil.nama_lengkap} kembali ${sisaMenit} menit lagi.`);
                 return; 
             }
         }
 
-        // FIX: Properti disesuaikan dengan skema tabel database di image_52258d.png
         const dataAbsenBaru = { 
             id_peserta: String(idPeserta),
             nama: profil.nama_lengkap,
@@ -517,7 +517,6 @@
 
         localLogs.push(dataAbsenBaru);
         localStorage.setItem('absensi_cai_lokal', JSON.stringify(localLogs));
-        bunyikanSuaraSukses();
         
         if (navigator.onLine) {
             try {
@@ -551,7 +550,7 @@
         let gabunganSemua = [...logAbsen, ...localLogs];
         let mapUnik = new Map();
         gabunganSemua.forEach(item => {
-            let key = (item.id_peserta || item.id_generus) + "_" + item.created_at; // FIX: Fallback kompatibilitas key unik
+            let key = (item.id_peserta || item.id_generus) + "_" + item.created_at; 
             mapUnik.set(key, item);
         });
         let logTerfilterFix = Array.from(mapUnik.values());
@@ -600,7 +599,6 @@
 
         for (let i = 0; i < localLogs.length; i++) {
             try {
-                // Pastikan key terformat id_peserta sebelum push manual/otomatis
                 if(localLogs[i].id_generus && !localLogs[i].id_peserta) {
                     localLogs[i].id_peserta = String(localLogs[i].id_generus);
                     delete localLogs[i].id_generus;
@@ -826,12 +824,13 @@
         setTimeout(() => { window.print(); }, 500);
     }
 
-    async function eksporKeExcel() {
-        let dataMurni = await dapatkanDataGabungan();
-        let csv = "No,Nama Lengkap,Kelompok,Desa,Hari Ke,Waktu,Metode\n";
-        dataMurni.forEach((d, i) => { csv += `${i+1},"${d.name}","${d.kelompok}","${d.desa}",Hari Ke-${d.hariKe},"${d.waktu}","${d.metode}"\n`; });
-        let blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-        let link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `REKAP_PERMATA_CAI.csv`; link.click();
+    function eksporKeExcel() {
+        dapatkanDataGabungan().then(dataMurni => {
+            let csv = "No,Nama Lengkap,Kelompok,Desa,Hari Ke,Waktu,Metode\n";
+            dataMurni.forEach((d, i) => { csv += `${i+1},"${d.name}","${d.kelompok}","${d.desa}",Hari Ke-${d.hariKe},"${d.waktu}","${d.metode}"\n`; });
+            let blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+            let link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `REKAP_PERMATA_CAI.csv`; link.click();
+        });
     }
 
     updateStatusInternet();
