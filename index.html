@@ -10,8 +10,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="CAI Presensi">
-    <link rel="apple-touch-icon" href="cai47.jpeg">
-    <link rel="icon" type="image/jpeg" href="cai47.jpeg">
+    
+    <!-- PERUBAHAN DI SINI: Mengarahkan ikon pintasan layar HP ke logo cai.png -->
+    <link rel="apple-touch-icon" href="logo cai.png">
+    <link rel="icon" type="image/png" href="logo cai.png">
 
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -227,6 +229,7 @@
     </div>
     
     <div class="brand-header">
+        <!-- PERUBAHAN DI SINI: Mengubah tampilan gambar logo utama di aplikasi jika diinginkan juga menggunakan logo baru -->
         <img src="cai47.jpeg" alt="Logo CAI" class="brand-logo" id="app-logo">
         <h2>PERMATA CAI</h2>
         <p>Sistem Presensi Kegiatan Digital</p>
@@ -374,12 +377,10 @@
             modal.classList.add('success-status');
             iconContainer.innerHTML = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
             titleContainer.style.color = "#1d4ed8";
-            bunyikanSuaraSukses();
         } else {
             modal.classList.add('error-status');
             iconContainer.innerHTML = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
             titleContainer.style.color = "#ef4444";
-            bunyikanSuaraGagal();
         }
 
         titleContainer.innerText = judul;
@@ -501,6 +502,7 @@
         if (logTerakhirSama) {
             let selisihJam = (waktuSekarang - new Date(logTerakhirSama.created_at)) / (1000 * 60 * 60);
             if (selisihJam < 3) {
+                bunyikanSuaraGagal(); 
                 let sisaMenit = Math.ceil((3 - selisihJam) * 60);
                 tampilkanNotifKustom('error', 'Sudah Absen', `${profil.nama_lengkap} kembali ${sisaMenit} menit lagi.`);
                 return; 
@@ -517,6 +519,7 @@
 
         localLogs.push(dataAbsenBaru);
         localStorage.setItem('absensi_cai_lokal', JSON.stringify(localLogs));
+        bunyikanSuaraSukses();
         
         if (navigator.onLine) {
             try {
@@ -824,13 +827,12 @@
         setTimeout(() => { window.print(); }, 500);
     }
 
-    function eksporKeExcel() {
-        dapatkanDataGabungan().then(dataMurni => {
-            let csv = "No,Nama Lengkap,Kelompok,Desa,Hari Ke,Waktu,Metode\n";
-            dataMurni.forEach((d, i) => { csv += `${i+1},"${d.name}","${d.kelompok}","${d.desa}",Hari Ke-${d.hariKe},"${d.waktu}","${d.metode}"\n`; });
-            let blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-            let link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `REKAP_PERMATA_CAI.csv`; link.click();
-        });
+    async function eksporKeExcel() {
+        let dataMurni = await dapatkanDataGabungan();
+        let csv = "No,Nama Lengkap,Kelompok,Desa,Hari Ke,Waktu,Metode\n";
+        dataMurni.forEach((d, i) => { csv += `${i+1},"${d.name}","${d.kelompok}","${d.desa}",Hari Ke-${d.hariKe},"${d.waktu}","${d.metode}"\n`; });
+        let blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+        let link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `REKAP_PERMATA_CAI.csv`; link.click();
     }
 
     updateStatusInternet();
