@@ -229,7 +229,6 @@
     </div>
     
     <div class="brand-header">
-        <!-- PERUBAHAN DI SINI: Mengubah tampilan gambar logo utama di aplikasi jika diinginkan juga menggunakan logo baru -->
         <img src="cai47.jpeg" alt="Logo CAI" class="brand-logo" id="app-logo">
         <h2>PERMATA CAI</h2>
         <p>Sistem Presensi Kegiatan Digital</p>
@@ -255,7 +254,7 @@
         
         <div class="waktu-filter-row">
             <select id="filter-rekap-hari" class="waktu-select" onchange="updateHariText()">
-                <option value="SEMUA">-- Semua Hari Acara --</option>
+                <option value="SEMUA">-- Semua Hari --</option>
                 <option value="1">Hari Ke-1</option>
                 <option value="2">Hari Ke-2</option>
                 <option value="3">Hari Ke-3</option>
@@ -266,6 +265,13 @@
                 <option value="8">Hari Ke-8</option>
                 <option value="9">Hari Ke-9</option>
                 <option value="10">Hari Ke-10</option>
+            </select>
+
+            <!-- PERUBAHAN DI SINI: Menambahkan drop down PESERTA dan PANITIA -->
+            <select id="filter-rekap-peran" class="waktu-select" onchange="updateHariText()">
+                <option value="SEMUA">-- Semua Peran --</option>
+                <option value="PESERTA">PESERTA</option>
+                <option value="PANITIA">PANITIA</option>
             </select>
         </div>
 
@@ -562,12 +568,16 @@
         let listTanggalUnik = [...new Set(logTerfilterFix.map(l => new Date(l.created_at).toDateString()))];
 
         const filterHari = document.getElementById('filter-rekap-hari').value;
+        const filterPeran = document.getElementById('filter-rekap-peran').value; // Ambil nilai filter peran
 
         let logTerfilterwaktu = logTerfilterFix.filter(absen => {
             let tglString = new Date(absen.created_at).toDateString();
             let indeksHari = listTanggalUnik.indexOf(tglString) + 1; 
-            if (filterHari === "SEMUA") return true;
-            return String(indeksHari) === filterHari;
+            
+            // Logika filter waktu/hari
+            if (filterHari !== "SEMUA" && String(indeksHari) !== filterHari) return false;
+            
+            return true;
         });
 
         return logTerfilterwaktu.map(absen => {
@@ -577,18 +587,31 @@
             let tglString = tanggalObj.toDateString();
             let nomorHari = listTanggalUnik.indexOf(tglString) + 1;
 
+            // Memastikan data status/peran terbaca dengan benar
+            let peranUser = "PESERTA";
+            if (detail && detail.status) {
+                let st = detail.status.toUpperCase();
+                if (st === "PANITIA" || st === "PENGURUS") {
+                    peranUser = "PANITIA";
+                }
+            }
+
             return {
                 id: targetId, 
                 name: absen.nama || (detail ? detail.nama_lengkap : "ID: " + targetId), 
                 kelompok: (absen.kelompok || (detail ? detail.kelompok : "-")).toUpperCase(),
                 desa: detail ? (detail.desa || "-").toUpperCase() : "-",
                 jk: detail ? (detail.jenis_kelamin || "-").toUpperCase() : "-", 
-                status: absen.metode_input,
+                status: peranUser, 
                 metode: absen.metode_input,
                 hariKe: nomorHari,
                 waktu: tanggalObj.toLocaleTimeString('id-ID'),
                 tanggalLengkap: tanggalObj.toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})
             }
+        }).filter(d => {
+            // PERUBAHAN DI SINI: Menyaring data rekap akhir berdasarkan pilihan filter dropdown Peran
+            if (filterPeran !== "SEMUA" && d.status !== filterPeran) return false;
+            return true;
         });
     }
 
@@ -638,8 +661,10 @@
         container.innerHTML = ""; resumeContainer.innerHTML = "";
         
         const txtHari = document.getElementById('filter-rekap-hari').options[document.getElementById('filter-rekap-hari').selectedIndex].text;
+        const txtPeran = document.getElementById('filter-rekap-peran').options[document.getElementById('filter-rekap-peran').selectedIndex].text;
+        
         document.getElementById('cetak-judul-kegiatan').innerText = "Laporan Presensi: PERMATA CAI";
-        document.getElementById('cetak-waktu').innerText = `Filter: ${txtHari} | Cetak: ` + new Date().toLocaleString('id-ID');
+        document.getElementById('cetak-waktu').innerText = `Filter: ${txtHari} (${txtPeran}) | Cetak: ` + new Date().toLocaleString('id-ID');
 
         let totalHadir = dataAktifRekap.filter(d => d.metode !== 'Izin').length;
         let totalIzin = dataAktifRekap.filter(d => d.metode === 'Izin').length;
@@ -705,31 +730,73 @@
     function renderTabelRekapSemuaSistem() {
         let container = document.getElementById('print-table-container');
         let areaCetak = document.getElementById('print-area');
-        let html = `<table class="print-table">
-                    <thead>
-                        <tr>
-                            <th style="width:30px; text-align:center;">No</th>
-                            <th>Nama Lengkap</th>
-                            <th style="width:50px; text-align:center;">L/P</th>
-                            <th>Kelompok</th>
-                            <th>Desa</th>
-                            <th>Keterangan Absen</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
+        
+        let dataPeserta = dataAktifRekap.filter(d => d.status === 'PESERTA');
+        let dataPanitia = dataAktifRekap.filter(d => d.status === 'PANITIA');
 
-        if(dataAktifRekap.length === 0) {
-            html += `<tr><td colspan="6" style="text-align:center; color:#ef4444; font-weight:600; padding:20px;">Tidak ada data presensi.</td></tr>`;
-        } else {
-            dataAktifRekap.forEach((d, i) => { 
-                let labelStatusText = d.metode === 'Izin' ? '<span style="color:var(--warning); font-weight:600;">IZIN</span>' : '<span style="color:var(--primary); font-weight:600;">HADIR</span>';
-                html += `<tr>
-                    <td style="text-align:center;">${i+1}</td><td style="font-weight:600;">${d.name}</td><td style="text-align:center;">${d.jk.includes('PEREMPUAN')?'P':'L'}</td>
-                    <td>${d.kelompok}</td><td>${d.desa}</td><td>Hari Ke-${d.hariKe} — ${labelStatusText} (${d.waktu})</td>
-                </tr>`; 
-            });
+        let html = "";
+        const filterPeran = document.getElementById('filter-rekap-peran').value;
+
+        // ================== TABEL PESERTA ==================
+        if (filterPeran === "SEMUA" || filterPeran === "PESERTA") {
+            html += `<h3 style="margin-top:20px; border-bottom: 2px solid #1d4ed8; padding-bottom:5px;">DATA KEHADIRAN PESERTA</h3>`;
+            html += `<table class="print-table">
+                        <thead>
+                            <tr>
+                                <th style="width:30px; text-align:center;">No</th>
+                                <th>Nama Lengkap</th>
+                                <th style="width:50px; text-align:center;">L/P</th>
+                                <th>Kelompok</th>
+                                <th>Desa</th>
+                                <th>Keterangan Absen</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+            if(dataPeserta.length === 0) {
+                html += `<tr><td colspan="6" style="text-align:center; color:#ef4444; padding:10px;">Tidak ada data presensi Peserta.</td></tr>`;
+            } else {
+                dataPeserta.forEach((d, i) => { 
+                    let labelStatusText = d.metode === 'Izin' ? '<span style="color:var(--warning); font-weight:600;">IZIN</span>' : '<span style="color:var(--primary); font-weight:600;">HADIR</span>';
+                    html += `<tr>
+                        <td style="text-align:center;">${i+1}</td><td style="font-weight:600;">${d.name}</td><td style="text-align:center;">${d.jk.includes('PEREMPUAN')?'P':'L'}</td>
+                        <td>${d.kelompok}</td><td>${d.desa}</td><td>Hari Ke-${d.hariKe} — ${labelStatusText} (${d.waktu})</td>
+                    </tr>`; 
+                });
+            }
+            html += `</tbody></table>`;
         }
-        html += `</tbody></table>`; container.innerHTML = html; areaCetak.style.display = "block";
+
+        // ================== TABEL PANITIA ==================
+        if (filterPeran === "SEMUA" || filterPeran === "PANITIA") {
+            html += `<h3 style="margin-top:40px; border-bottom: 2px solid #0369a1; padding-bottom:5px;">DATA KEHADIRAN PANITIA / PENGURUS</h3>`;
+            html += `<table class="print-table">
+                        <thead>
+                            <tr>
+                                <th style="width:30px; text-align:center;">No</th>
+                                <th>Nama Lengkap</th>
+                                <th style="width:50px; text-align:center;">L/P</th>
+                                <th>Kelompok</th>
+                                <th>Desa</th>
+                                <th>Keterangan Absen</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+            if(dataPanitia.length === 0) {
+                html += `<tr><td colspan="6" style="text-align:center; color:#ef4444; padding:10px;">Tidak ada data presensi Panitia.</td></tr>`;
+            } else {
+                dataPanitia.forEach((d, i) => { 
+                    let labelStatusText = d.metode === 'Izin' ? '<span style="color:var(--warning); font-weight:600;">IZIN</span>' : '<span style="color:var(--primary); font-weight:600;">HADIR</span>';
+                    html += `<tr>
+                        <td style="text-align:center;">${i+1}</td><td style="font-weight:600;">${d.name}</td><td style="text-align:center;">${d.jk.includes('PEREMPUAN')?'P':'L'}</td>
+                        <td>${d.kelompok}</td><td>${d.desa}</td><td>Hari Ke-${d.hariKe} — ${labelStatusText} (${d.waktu})</td>
+                    </tr>`; 
+                });
+            }
+            html += `</tbody></table>`;
+        }
+
+        container.innerHTML = html; 
+        areaCetak.style.display = "block";
     }
 
     async function tarikRekapTotalLangsung() {
@@ -759,15 +826,30 @@
         });
         
         let listIdTerabsen = [...new Set(dataMentahTahunanLog.map(l => String(l.id_peserta || l.id_generus)))]; 
-        dataMasterTahunanOrang = semuaDataGenerus.filter(g => listIdTerabsen.includes(String(g.id_generus))); 
+        
+        const filterPeran = document.getElementById('filter-rekap-peran').value;
+        dataMasterTahunanOrang = semuaDataGenerus.filter(g => {
+            if (!listIdTerabsen.includes(String(g.id_generus))) return false;
+            
+            // Menyaring status peran pada rekap total full acara
+            let peranUser = "PESERTA";
+            if (g.status) {
+                let st = g.status.toUpperCase();
+                if (st === "PANITIA" || st === "PENGURUS") peranUser = "PANITIA";
+            }
+            if (filterPeran !== "SEMUA" && peranUser !== filterPeran) return false;
+            
+            return true;
+        }); 
 
         if(dataMasterTahunanOrang.length === 0) {
-            return tampilkanNotifKustom('error', 'Kosong', 'Belum ada data anggota yang terabsen.');
+            return tampilkanNotifKustom('error', 'Kosong', 'Belum ada data anggota dengan peran ini.');
         }
 
         dataMasterTahunanOrang.sort((a,b) => (a.nama_lengkap || '').localeCompare(b.nama_lengkap)); 
 
-        document.getElementById('cetak-judul-kegiatan').innerText = `REKAP TOTAL PRESENSI FULL ACARA: PERMATA CAI`;
+        const txtPeran = document.getElementById('filter-rekap-peran').options[document.getElementById('filter-rekap-peran').selectedIndex].text;
+        document.getElementById('cetak-judul-kegiatan').innerText = `REKAP TOTAL PRESENSI FULL ACARA (${txtPeran})`;
         document.getElementById('cetak-waktu').innerText = `Cetak: ` + new Date().toLocaleString('id-ID');
         document.getElementById('resume-kehadiran-container').innerHTML = "";
 
@@ -829,8 +911,8 @@
 
     async function eksporKeExcel() {
         let dataMurni = await dapatkanDataGabungan();
-        let csv = "No,Nama Lengkap,Kelompok,Desa,Hari Ke,Waktu,Metode\n";
-        dataMurni.forEach((d, i) => { csv += `${i+1},"${d.name}","${d.kelompok}","${d.desa}",Hari Ke-${d.hariKe},"${d.waktu}","${d.metode}"\n`; });
+        let csv = "No,Nama Lengkap,Kelompok,Desa,Peran,Hari Ke,Waktu,Metode\n";
+        dataMurni.forEach((d, i) => { csv += `${i+1},"${d.name}","${d.kelompok}","${d.desa}","${d.status}",Hari Ke-${d.hariKe},"${d.waktu}","${d.metode}"\n`; });
         let blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
         let link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `REKAP_PERMATA_CAI.csv`; link.click();
     }
