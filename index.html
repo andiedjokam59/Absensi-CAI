@@ -821,12 +821,10 @@
             return { ...log, hariKe: nHari };
         });
         
-        let listIdTerabsen = [...new Set(dataMentahTahunanLog.map(l => String(l.id_peserta || l.id_generus)))]; 
-        
         const filterPeran = document.getElementById('filter-rekap-peran').value;
+        
+        // PERUBAHAN DI SINI: Tidak lagi menyaring berdasarkan listIdTerabsen agar semua yang terdaftar muncul
         dataMasterTahunanOrang = semuaDataGenerus.filter(g => {
-            if (!listIdTerabsen.includes(String(g.id_generus))) return false;
-            
             // Menyaring status peran pada rekap total full acara
             let peranUser = "PESERTA";
             if (g.status) {
