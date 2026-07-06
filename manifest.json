@@ -5,18 +5,18 @@
   "scope": "./",
   "start_url": "./index.html",
   "name": "Presensi Kegiatan",
-  "short_name": "Presensi",
+  "short_name": "Presensi CAI",
   "description": "Aplikasi Presensi Insan Qur'any Tawangmangu",
   "icons": [
     {
-      "src": "logo insan qurany.jpg",
+      "src": "logo cai.png",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/png"
     },
     {
-      "src": "logo insan qurany.jpg",
+      "src": "logo cai.png",
       "sizes": "512x512",
-      "type": "image/jpeg"
+      "type": "image/png"
     }
   ]
 }
