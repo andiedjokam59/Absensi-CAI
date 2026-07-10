@@ -844,7 +844,7 @@
             return true;
         }); 
 
-        // PERBAIKAN: Diurutkan berdasarkan KELOMPOK terlebih dahulu, lalu berdasarkan NAMA LENGKAP
+        // Diurutkan berdasarkan KELOMPOK, lalu NAMA LENGKAP
         dataMasterTahunanOrang.sort((a, b) => {
             let klpA = (a.kelompok || '').toUpperCase();
             let klpB = (b.kelompok || '').toUpperCase();
@@ -882,6 +882,12 @@
                     <tbody>`;
 
         const daftarSesiArr = ["PAGI", "SIANG", "MALAM"];
+        
+        // --- LOGIKA DETEKSI WAKTU SEKARANG ---
+        let waktuSekarang = new Date();
+        let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, logTerfilterFix);
+        let sesiSekarang = hitungSesiBerdasarkanWaktu(waktuSekarang.getHours());
+        let indeksSesiSekarang = daftarSesiArr.indexOf(sesiSekarang);
 
         dataMasterTahunanOrang.forEach((orang, idx) => {
             let logOrang = dataMentahTahunanLog.filter(l => String(l.id_peserta || l.id_generus) === String(orang.id_generus)); 
@@ -896,7 +902,7 @@
             let totalHadir = 0; let totalIzin = 0;
 
             for (let h = 1; h <= 3; h++) {
-                daftarSesiArr.forEach(sNama => {
+                daftarSesiArr.forEach((sNama, sIdx) => {
                     let borderKiriStyle = (sNama === "PAGI") ? "border-left:2px solid #cbd5e1;" : "";
                     let borderKananStyle = (sNama === "MALAM") ? "border-right:2px solid #cbd5e1;" : "";
                     let styleCombine = borderKiriStyle + borderKananStyle;
@@ -914,7 +920,23 @@
                             html += `<td style="text-align:center; color:#0284c7; font-weight:700; font-size:8px; ${styleCombine}">IZN</td>`; 
                             totalIzin++; 
                         } else { 
-                            html += `<td style="text-align:center; color:#cbd5e1; ${styleCombine}">-</td>`; 
+                            // --- PENGECEKAN JIKA KETINGGALAN SESI ---
+                            let apakahSesiSudahLewat = false;
+                            if (h < hariKeSekarang) {
+                                apakahSesiSudahLewat = true; // Hari kemarin sudah pasti lewat
+                            } else if (h === hariKeSekarang) {
+                                if (sIdx < indeksSesiSekarang) {
+                                    apakahSesiSudahLewat = true; // Sesi di hari yang sama tapi jamnya sudah lewat
+                                }
+                            }
+
+                            if (apakahSesiSudahLewat) {
+                                // Jika sudah lewat dan kosong, otomatis isi 'X' merah
+                                html += `<td style="text-align:center; color:#ef4444; font-weight:700; ${styleCombine}">X</td>`;
+                            } else {
+                                // Jika sesi di masa depan atau sesi yang sedang berjalan sekarang, biarkan strip '-'
+                                html += `<td style="text-align:center; color:#cbd5e1; ${styleCombine}">-</td>`; 
+                            }
                         }
                     }
                 });
