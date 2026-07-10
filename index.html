@@ -521,35 +521,14 @@
 		let localLogs = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
 		let riwayatGabungan = [...localLogs];
 		
-		// 1. KITA PAKSA AMBIL DATA CLOUD DULU (Tanpa cek navigator.onLine)
-		try {
-			let { data: cloudLogs, error: fetchError } = await _supabase.from('absensi_cai').select('created_at, catatan_sesi, id_peserta'); 
-			if (cloudLogs) riwayatGabungan = riwayatGabungan.concat(cloudLogs);
-		} catch(e) {
-			console.warn("Gagal fetch data cloud (mungkin benar-benar offline/gangguan):", e);
-		}
-
+		// Ambil data lokal yang ada untuk kalkulasi hari secara cepat
 		let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, riwayatGabungan);
 
-		// Validasi duplikasi
-		let logSesiSama = riwayatGabungan.find(l => {
-			if(!l.created_at) return false;
-			if(String(l.id_peserta || l.id_generus) !== String(idPeserta)) return false;
+		// 1. RESPONS INSTAN: Bunyikan suara & tampilkan notifikasi SEGERA tanpa nunggu internet!
+		bunyikanSuaraSukses();
+		tampilkanNotifKustom('success', `Hari ${hariKeSekarang} (${sesiSekarang})`, profil.nama_lengkap);
 
-			let dLog = new Date(l.created_at);
-			let hLog = dapatkanHariKeBerdasarkanLog(dLog, riwayatGabungan);
-			let sLog = l.catatan_sesi || hitungSesiBerdasarkanWaktu(dLog.getHours());
-			
-			return hLog === hariKeSekarang && sLog === sesiSekarang;
-		});
-
-		if (logSesiSama) {
-			bunyikanSuaraGagal(); 
-			tampilkanNotifKustom('error', 'Sudah Absen', `${profil.nama_lengkap} sudah absen di Hari ${hariKeSekarang} Sesi ${sesiSekarang}.`);
-			return; 
-		}
-
-		// Siapkan objek data bersih
+		// Siapkan objek data
 		const dataAbsenBaru = { 
 			id_peserta: String(idPeserta).trim(),
 			nama: String(profil.nama_lengkap || '').trim(),
@@ -559,30 +538,35 @@
 			created_at: waktuSekarang.toISOString() 
 		};
 
-		bunyikanSuaraSukses();
-		
-		// 2. PAKSA LANGSUNG TEMBAK KE SUPABASE
+		// 2. Simpan ke local storage dulu agar aman jika tiba-tiba internet putus
+		localLogs.push(dataAbsenBaru);
+		localStorage.setItem('absensi_cai_lokal', JSON.stringify(localLogs));
+
+		// 3. PROSES LATAR BELAKANG (Kirim ke Supabase tanpa memblokir kamera)
+		// Kita hilangkan "await" di depan fungsi ini agar berjalan di background
+		kirimDataKeSupabaseBackground(dataAbsenBaru, idPeserta);
+	}
+
+	// Fungsi pembantu baru untuk mengirim ke cloud di latar belakang
+	async function kirimDataKeSupabaseBackground(dataAbsenBaru, idPeserta) {
 		try {
+			// Cek duplikasi di cloud secara langsung saat insert (jika RLS/Unique constraint aktif)
+			// Atau biarkan Supabase menerima datanya
 			let { error: insertError } = await _supabase.from('absensi_cai').insert([dataAbsenBaru]);
 			
 			if (!insertError) {
-				// JIKA BERHASIL MASUK CLOUD: Tampilkan notifikasi sukses cloud resmi!
-				tampilkanNotifKustom('success', `Hari ${hariKeSekarang} (${sesiSekarang})`, profil.nama_lengkap);
-				return; // Selesai, tidak perlu masuk ke penyimpanan lokal cadangan
+				// Jika sukses masuk cloud, hapus data ini dari antrean lokal agar tidak double saat sinkronisasi manual
+				let logsSesudahUpload = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
+				// Cari dan hapus item yang sama
+				logsSesudahUpload = logsSesudahUpload.filter(l => !(String(l.id_peserta) === String(idPeserta) && l.created_at === dataAbsenBaru.created_at));
+				localStorage.setItem('absensi_cai_lokal', JSON.stringify(logsSesudahUpload));
+				console.log("Data berhasil diamankan ke Cloud Supabase di latar belakang.");
 			} else {
-				// Jika Supabase merespons tapi menolak (misal masalah kolom atau DB error)
-				console.error("Supabase Menolak Data! Detail Error:", insertError);
-				alert("Supabase Menolak Data! Error: " + JSON.stringify(insertError));
+				console.error("Supabase menolak data di latar belakang:", insertError);
 			}
 		} catch (err) {
-			// Jika gagal karena jaringan/RTO/benar-benar offline
-			console.warn("Gagal terhubung ke cloud, dialihkan ke penyimpanan lokal:", err);
+			console.warn("Koneksi Supabase gagal/delay, data tetap aman di lokal browser.", err);
 		}
-
-		// 3. JALUR CADANGAN: Jika cloud gagal/offline, baru amankan ke lokal browser
-		localLogs.push(dataAbsenBaru);
-		localStorage.setItem('absensi_cai_lokal', JSON.stringify(localLogs));
-		tampilkanNotifKustom('success', `Lokal H${hariKeSekarang} (${sesiSekarang})`, profil.nama_lengkap + ' [Offline]');
 	}
 
     function inputManualKehadiran() { if(!selectedIdInput.value) return tampilkanNotifKustom('error', 'Gagal', 'Pilih nama terlebih dahulu!'); prosesAbsensi(selectedIdInput.value, "Manual"); searchInput.value=''; selectedIdInput.value=''; }
