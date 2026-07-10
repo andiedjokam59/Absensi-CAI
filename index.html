@@ -521,14 +521,11 @@
 		let localLogs = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
 		let riwayatGabungan = [...localLogs];
 		
-		// Ambil data lokal yang ada untuk kalkulasi hari secara cepat
 		let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, riwayatGabungan);
 
-		// 1. RESPONS INSTAN: Bunyikan suara & tampilkan notifikasi SEGERA tanpa nunggu internet!
 		bunyikanSuaraSukses();
 		tampilkanNotifKustom('success', `Hari ${hariKeSekarang} (${sesiSekarang})`, profil.nama_lengkap);
 
-		// Siapkan objek data
 		const dataAbsenBaru = { 
 			id_peserta: String(idPeserta).trim(),
 			nama: String(profil.nama_lengkap || '').trim(),
@@ -538,26 +535,17 @@
 			created_at: waktuSekarang.toISOString() 
 		};
 
-		// 2. Simpan ke local storage dulu agar aman jika tiba-tiba internet putus
 		localLogs.push(dataAbsenBaru);
 		localStorage.setItem('absensi_cai_lokal', JSON.stringify(localLogs));
 
-		// 3. PROSES LATAR BELAKANG (Kirim ke Supabase tanpa memblokir kamera)
-		// Kita hilangkan "await" di depan fungsi ini agar berjalan di background
 		kirimDataKeSupabaseBackground(dataAbsenBaru, idPeserta);
 	}
 
-	// Fungsi pembantu baru untuk mengirim ke cloud di latar belakang
 	async function kirimDataKeSupabaseBackground(dataAbsenBaru, idPeserta) {
 		try {
-			// Cek duplikasi di cloud secara langsung saat insert (jika RLS/Unique constraint aktif)
-			// Atau biarkan Supabase menerima datanya
 			let { error: insertError } = await _supabase.from('absensi_cai').insert([dataAbsenBaru]);
-			
 			if (!insertError) {
-				// Jika sukses masuk cloud, hapus data ini dari antrean lokal agar tidak double saat sinkronisasi manual
 				let logsSesudahUpload = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
-				// Cari dan hapus item yang sama
 				logsSesudahUpload = logsSesudahUpload.filter(l => !(String(l.id_peserta) === String(idPeserta) && l.created_at === dataAbsenBaru.created_at));
 				localStorage.setItem('absensi_cai_lokal', JSON.stringify(logsSesudahUpload));
 				console.log("Data berhasil diamankan ke Cloud Supabase di latar belakang.");
@@ -590,6 +578,8 @@
             mapUnik.set(key, item);
         });
         let logTerfilterFix = Array.from(mapUnik.values());
+        
+        // PERBAIKAN: Selalu urutkan berdasarkan waktu absen (paling awal ke paling akhir)
         logTerfilterFix.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
 
         const filterHari = document.getElementById('filter-rekap-hari').value;
@@ -621,7 +611,8 @@
                 hariKe: nomorHari,
                 sesi: sLog,
                 waktu: tanggalObj.toLocaleTimeString('id-ID'),
-                tanggalLengkap: tanggalObj.toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})
+                tanggalLengkap: tanggalObj.toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}),
+                rawTime: tanggalObj // disimpan untuk keperluan sorting jika dibutuhkan eksternal
             }
         }).filter(d => {
             if (d.hariKe > 3) return false; 
@@ -764,6 +755,7 @@
         let container = document.getElementById('print-table-container');
         let areaCetak = document.getElementById('print-area');
         
+        // Data sudah otomatis terurut berdasarkan waktu absen dari fungsi dapatkanDataGabungan()
         let dataPeserta = dataAktifRekap.filter(d => d.status === 'PESERTA');
         let dataPanitia = dataAktifRekap.filter(d => d.status === 'PANITIA');
 
@@ -852,7 +844,15 @@
             return true;
         }); 
 
-        dataMasterTahunanOrang.sort((a,b) => (a.nama_lengkap || '').localeCompare(b.nama_lengkap)); 
+        // PERBAIKAN: Diurutkan berdasarkan KELOMPOK terlebih dahulu, lalu berdasarkan NAMA LENGKAP
+        dataMasterTahunanOrang.sort((a, b) => {
+            let klpA = (a.kelompok || '').toUpperCase();
+            let klpB = (b.kelompok || '').toUpperCase();
+            if (klpA !== klpB) {
+                return klpA.localeCompare(klpB);
+            }
+            return (a.nama_lengkap || '').localeCompare(b.nama_lengkap);
+        }); 
 
         const txtPeran = document.getElementById('filter-rekap-peran').options[document.getElementById('filter-rekap-peran').selectedIndex].text;
         document.getElementById('cetak-judul-kegiatan').innerText = `REKAP TOTAL FULL ACARA 3 HARI TIMELINE DINAMIS (${txtPeran})`;
@@ -861,9 +861,9 @@
 
         let headerHariHtml = "";
         for (let h = 1; h <= 3; h++) { 
-            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0; border-left:2px solid #64748b;">H${h}-Pg</th>`; 
-            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0;">H${h}-Sg</th>`; 
-            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0; border-right:2px solid #64748b;">H${h}-Ml</th>`; 
+            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0; border-left:2px solid #64748b;">H1-Pg</th>`.replace(/H1/g, 'H' + h); 
+            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0;">H1-Sg</th>`.replace(/H1/g, 'H' + h); 
+            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0; border-right:2px solid #64748b;">H1-Ml</th>`.replace(/H1/g, 'H' + h); 
         }
 
         let html = `<table class="print-table">
