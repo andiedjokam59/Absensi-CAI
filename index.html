@@ -203,8 +203,11 @@
         .resume-kehadiran-box { background: var(--bg-main); border: 1px solid var(--border-color); padding: 12px 16px; border-radius: 12px; margin-bottom: 15px; font-size: 12px; font-weight: 600; display: flex; flex-direction: column; gap: 6px; }
         .resume-row { display: flex; gap: 16px; }
 
-        .waktu-filter-row { grid-column: span 6; display: flex; gap: 6px; margin-bottom: 4px; background: var(--bg-main); padding: 6px; border-radius: 12px; border: 1px dashed var(--border-color); }
+        .waktu-filter-row { grid-column: span 6; display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; background: var(--bg-main); padding: 8px; border-radius: 12px; border: 1px dashed var(--border-color); }
+        .filter-group-select { display: flex; gap: 6px; width: 100%; }
         .waktu-select { flex: 1; padding: 8px 10px; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-dark); outline: none; cursor: pointer; font-family: inherit; text-align: center; }
+
+        .disabled-print-cell { background-color: #f1f5f9 !important; color: #cbd5e1 !important; }
 
         @media print {
             body { background: #fff!important; color: #000!important; display: block; }
@@ -249,21 +252,22 @@
     <div class="action-row">
         
         <div class="waktu-filter-row">
-            <select id="filter-rekap-hari" class="waktu-select" onchange="updateHariText()">
-                <option value="SEMUA">-- Semua Hari --</option>
-                <option value="1">Hari Ke-1</option>
-                <option value="2">Hari Ke-2</option>
-                <option value="3">Hari Ke-3</option>
-                <option value="4">Hari Ke-4</option>
-                <option value="5">Hari Ke-5</option>
-                <option value="6">Hari Ke-6</option>
-                <option value="7">Hari Ke-7</option>
-                <option value="8">Hari Ke-8</option>
-                <option value="9">Hari Ke-9</option>
-                <option value="10">Hari Ke-10</option>
-            </select>
+            <div class="filter-group-select">
+                <select id="filter-rekap-hari" class="waktu-select" onchange="updateHariText()">
+                    <option value="SEMUA">-- Semua Hari --</option>
+                    <option value="1">Hari Ke-1</option>
+                    <option value="2">Hari Ke-2</option>
+                    <option value="3">Hari Ke-3</option>
+                </select>
 
-            <!-- PERUBAHAN DI SINI: Menambahkan drop down PESERTA dan PANITIA -->
+                <select id="filter-rekap-sesi" class="waktu-select" onchange="updateHariText()">
+                    <option value="SEMUA">-- Semua Sesi --</option>
+                    <option value="PAGI">Sesi PAGI</option>
+                    <option value="SIANG">Sesi SIANG</option>
+                    <option value="MALAM">Sesi MALAM</option>
+                </select>
+            </div>
+
             <select id="filter-rekap-peran" class="waktu-select" onchange="updateHariText()">
                 <option value="SEMUA">-- Semua Peran --</option>
                 <option value="PESERTA">PESERTA</option>
@@ -288,7 +292,7 @@
             Simpan
         </button>
         
-        <button class="btn-icon" onclick="printSemuaOtomatis()" title="Print Semua">
+        <button class="btn-icon" onclick="printSemuaOtomatis()" title="Print Rekap Full Acara">
             <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
             Print
         </button>
@@ -472,6 +476,12 @@
         }
     }
 
+    function hitungSesiBerdasarkanWaktu(jam) {
+        if (jam >= 4 && jam < 11) return "PAGI";
+        else if (jam >= 11 && jam < 16) return "SIANG";
+        else return "MALAM";
+    }
+
     async function onScanSuccess(decodedText) { 
         if (pengunciScanAktif) return; pengunciScanAktif = true; 
         await prosesAbsensi(decodedText, "Scan Barcode");
@@ -480,35 +490,66 @@
     let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 220 });
     html5QrcodeScanner.render(onScanSuccess);
 
+    // LOGIKA DINAMIS: Menghitung index Hari Ke- (1, 2, atau 3) berdasarkan log pertama yang pernah ada
+    function dapatkanHariKeBerdasarkanLog(waktuSekarang, seluruhLog) {
+        if (!seluruhLog || seluruhLog.length === 0) {
+            return 1; // Jika benar-benar kosong, ini adalah scan pertama (Hari Ke-1)
+        }
+        
+        // Cari timestamp paling awal dari seluruh data sebagai benchmark dimulainya acara
+        let salinanLog = [...seluruhLog].filter(l => l.created_at);
+        salinanLog.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        
+        if (salinanLog.length === 0) return 1;
+
+        let waktuPertamaMulai = new Date(salinanLog[0].created_at);
+        
+        // Reset jam ke 00:00 untuk murni membandingkan selisih kalender hari
+        let d1 = new Date(waktuPertamaMulai.getFullYear(), waktuPertamaMulai.getMonth(), waktuPertamaMulai.getDate());
+        let d2 = new Date(waktuSekarang.getFullYear(), waktuSekarang.getMonth(), waktuSekarang.getDate());
+        
+        let selisihMilidetik = d2 - d1;
+        let selisihHari = Math.floor(selisihMilidetik / (1000 * 60 * 60 * 24));
+        
+        let targetHari = selisihHari + 1;
+        return (targetHari > 0) ? targetHari : 1; 
+    }
+
     async function prosesAbsensi(idPeserta, metode) {
         let profil = semuaDataGenerus.find(g => String(g.id_generus) === String(idPeserta)) || { nama_lengkap: "ID: " + idPeserta, kelompok: "-" };
         let waktuSekarang = new Date();
+        let jamSekarang = waktuSekarang.getHours();
+        let sesiSekarang = hitungSesiBerdasarkanWaktu(jamSekarang);
         
         let localLogs = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
         let riwayatGabungan = [...localLogs];
         
         if (navigator.onLine) {
             try {
-                let { data: cloudLogs } = await _supabase
-                    .from('absensi_cai')
-                    .select('created_at')
-                    .eq('id_peserta', idPeserta); 
+                let { data: cloudLogs } = await _supabase.from('absensi_cai').select('created_at, catatan_sesi, id_peserta'); 
                 if (cloudLogs) riwayatGabungan = riwayatGabungan.concat(cloudLogs);
             } catch(e) {}
         }
 
-        let logTerakhirSama = riwayatGabungan
-            .filter(l => l.created_at)
-            .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))[0];
+        // Tentukan Hari Ke berapa saat ini berdasarkan timeline data real-time
+        let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, riwayatGabungan);
 
-        if (logTerakhirSama) {
-            let selisihJam = (waktuSekarang - new Date(logTerakhirSama.created_at)) / (1000 * 60 * 60);
-            if (selisihJam < 3) {
-                bunyikanSuaraGagal(); 
-                let sisaMenit = Math.ceil((3 - selisihJam) * 60);
-                tampilkanNotifKustom('error', 'Sudah Absen', `${profil.nama_lengkap} kembali ${sisaMenit} menit lagi.`);
-                return; 
-            }
+        // Validasi Duplikasi: Cari apakah user ini sudah absen di HARI dan SESI dinamis yang sama
+        let logSesiSama = riwayatGabungan.find(l => {
+            if(!l.created_at) return false;
+            if(String(l.id_peserta || l.id_generus) !== String(idPeserta)) return false;
+
+            let dLog = new Date(l.created_at);
+            let hLog = dapatkanHariKeBerdasarkanLog(dLog, riwayatGabungan);
+            let sLog = l.catatan_sesi || hitungSesiBerdasarkanWaktu(dLog.getHours());
+            
+            return hLog === hariKeSekarang && sLog === sesiSekarang;
+        });
+
+        if (logSesiSama) {
+            bunyikanSuaraGagal(); 
+            tampilkanNotifKustom('error', 'Sudah Absen', `${profil.nama_lengkap} sudah absen di Hari ${hariKeSekarang} Sesi ${sesiSekarang}.`);
+            return; 
         }
 
         const dataAbsenBaru = { 
@@ -516,6 +557,7 @@
             nama: profil.nama_lengkap,
             kelompok: profil.kelompok,
             metode_input: metode, 
+            catatan_sesi: sesiSekarang, 
             created_at: waktuSekarang.toISOString() 
         };
 
@@ -530,12 +572,12 @@
                     let logsSesudahUpload = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
                     logsSesudahUpload.pop(); 
                     localStorage.setItem('absensi_cai_lokal', JSON.stringify(logsSesudahUpload));
-                    tampilkanNotifKustom('success', 'Berhasil (Cloud)', profil.nama_lengkap);
+                    tampilkanNotifKustom('success', `Hari ${hariKeSekarang} (${sesiSekarang})`, profil.nama_lengkap);
                     return;
                 }
             } catch (err) {}
         }
-        tampilkanNotifKustom('success', 'Berhasil (Offline)', profil.nama_lengkap + ' [Tersimpan Lokal]');
+        tampilkanNotifKustom('success', `Lokal H${hariKeSekarang} (${sesiSekarang})`, profil.nama_lengkap + ' [Offline]');
     }
 
     function inputManualKehadiran() { if(!selectedIdInput.value) return tampilkanNotifKustom('error', 'Gagal', 'Pilih nama terlebih dahulu!'); prosesAbsensi(selectedIdInput.value, "Manual"); searchInput.value=''; selectedIdInput.value=''; }
@@ -551,45 +593,32 @@
         }
 
         let localLogs = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
-        
         let gabunganSemua = [...logAbsen, ...localLogs];
+        
         let mapUnik = new Map();
         gabunganSemua.forEach(item => {
             let key = (item.id_peserta || item.id_generus) + "_" + item.created_at; 
             mapUnik.set(key, item);
         });
         let logTerfilterFix = Array.from(mapUnik.values());
-
         logTerfilterFix.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-        let listTanggalUnik = [...new Set(logTerfilterFix.map(l => new Date(l.created_at).toDateString()))];
 
         const filterHari = document.getElementById('filter-rekap-hari').value;
-        const filterPeran = document.getElementById('filter-rekap-peran').value; // Ambil nilai filter peran
+        const filterSesi = document.getElementById('filter-rekap-sesi').value;
+        const filterPeran = document.getElementById('filter-rekap-peran').value; 
 
-        let logTerfilterwaktu = logTerfilterFix.filter(absen => {
-            let tglString = new Date(absen.created_at).toDateString();
-            let indeksHari = listTanggalUnik.indexOf(tglString) + 1; 
-            
-            // Logika filter waktu/hari
-            if (filterHari !== "SEMUA" && String(indeksHari) !== filterHari) return false;
-            
-            return true;
-        });
-
-        return logTerfilterwaktu.map(absen => {
+        return logTerfilterFix.map(absen => {
             let targetId = absen.id_peserta || absen.id_generus;
             let detail = semuaDataGenerus.find(g => String(g.id_generus) === String(targetId)); 
             let tanggalObj = new Date(absen.created_at);
-            let tglString = tanggalObj.toDateString();
-            let nomorHari = listTanggalUnik.indexOf(tglString) + 1;
+            
+            let nomorHari = dapatkanHariKeBerdasarkanLog(tanggalObj, logTerfilterFix);
+            let sLog = absen.catatan_sesi || hitungSesiBerdasarkanWaktu(tanggalObj.getHours());
 
-            // Memastikan data status/peran terbaca dengan benar
             let peranUser = "PESERTA";
             if (detail && detail.status) {
                 let st = detail.status.toUpperCase();
-                if (st === "PANITIA" || st === "PENGURUS") {
-                    peranUser = "PANITIA";
-                }
+                if (st === "PANITIA" || st === "PENGURUS") peranUser = "PANITIA";
             }
 
             return {
@@ -601,11 +630,14 @@
                 status: peranUser, 
                 metode: absen.metode_input,
                 hariKe: nomorHari,
+                sesi: sLog,
                 waktu: tanggalObj.toLocaleTimeString('id-ID'),
                 tanggalLengkap: tanggalObj.toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})
             }
         }).filter(d => {
-            // PERUBAHAN DI SINI: Menyaring data rekap akhir berdasarkan pilihan filter dropdown Peran
+            if (d.hariKe > 3) return false; // Batasi timeline 3 hari fleksibel
+            if (filterHari !== "SEMUA" && String(d.hariKe) !== filterHari) return false;
+            if (filterSesi !== "SEMUA" && d.sesi !== filterSesi) return false;
             if (filterPeran !== "SEMUA" && d.status !== filterPeran) return false;
             return true;
         });
@@ -648,19 +680,24 @@
     async function tarikDanCetakLaporan(jenis, langsungPrint = false) {
         dataAktifRekap = await dapatkanDataGabungan();
         
-        if(dataAktifRekap.length === 0) return tampilkanNotifKustom('error', 'Kosong', 'Belum ada data presensi.');
-        
         let container = document.getElementById('print-table-container');
         let resumeContainer = document.getElementById('resume-kehadiran-container');
         let areaCetak = document.getElementById('print-area'); 
         
         container.innerHTML = ""; resumeContainer.innerHTML = "";
         
+        if(dataAktifRekap.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-muted); font-weight:600;">Belum ada data presensi masuk. Acara belum dimulai.</div>`;
+            areaCetak.style.display = "block";
+            return;
+        }
+        
         const txtHari = document.getElementById('filter-rekap-hari').options[document.getElementById('filter-rekap-hari').selectedIndex].text;
+        const txtSesi = document.getElementById('filter-rekap-sesi').options[document.getElementById('filter-rekap-sesi').selectedIndex].text;
         const txtPeran = document.getElementById('filter-rekap-peran').options[document.getElementById('filter-rekap-peran').selectedIndex].text;
         
-        document.getElementById('cetak-judul-kegiatan').innerText = "Laporan Presensi: PERMATA CAI";
-        document.getElementById('cetak-waktu').innerText = `Filter: ${txtHari} (${txtPeran}) | Cetak: ` + new Date().toLocaleString('id-ID');
+        document.getElementById('cetak-judul-kegiatan').innerText = "Laporan Presensi: PERMATA CAI (Timeline Dinamis)";
+        document.getElementById('cetak-waktu').innerText = `Filter: ${txtHari} — ${txtSesi} (${txtPeran}) | Cetak: ` + new Date().toLocaleString('id-ID');
 
         let totalHadir = dataAktifRekap.filter(d => d.metode !== 'Izin').length;
         let totalIzin = dataAktifRekap.filter(d => d.metode === 'Izin').length;
@@ -710,11 +747,11 @@
                                 <span style="font-size:11px; text-transform:none; color:var(--text-muted);">Hadir: ${hKlp} | Izin: ${iKlp}</span>
                             </h4>
                             <table class="print-table">
-                                <thead><tr><th style="width:30px; text-align:center;">No</th><th>Nama Lengkap</th><th style="width:50px; text-align:center;">L/P</th><th>Status Absen</th><th>Hari & Waktu</th></tr></thead>
+                                <thead><tr><th style="width:30px; text-align:center;">No</th><th>Nama Lengkap</th><th style="width:50px; text-align:center;">L/P</th><th>Status Absen</th><th>Hari & Sesi</th></tr></thead>
                                 <tbody>`;
                 rekapKlp[k].forEach((a, i) => { 
                     let st = a.metode === 'Izin' ? '<span style="color:var(--warning); font-weight:700;">IZIN</span>' : '<span style="color:var(--primary); font-weight:700;">HADIR</span>';
-                    html += `<tr><td style="text-align:center;">${i+1}</td><td style="font-weight:600;">${a.name}</td><td style="text-align:center;">${a.jk.includes('PEREMPUAN')?'P':'L'}</td><td>${st} (${a.metode})</td><td>Hari Ke-${a.hariKe} (${a.tanggalLengkap} - ${a.waktu})</td></tr>`; 
+                    html += `<tr><td style="text-align:center;">${i+1}</td><td style="font-weight:600;">${a.name}</td><td style="text-align:center;">${a.jk.includes('PEREMPUAN')?'P':'L'}</td><td>${st} (${a.metode})</td><td>Hari ${a.hariKe} — Sesi ${a.sesi} (${a.waktu})</td></tr>`; 
                 });
                 html += `</tbody></table></div>`;
             }
@@ -733,66 +770,38 @@
         let html = "";
         const filterPeran = document.getElementById('filter-rekap-peran').value;
 
-        // ================== TABEL PESERTA ==================
         if (filterPeran === "SEMUA" || filterPeran === "PESERTA") {
             html += `<h3 style="margin-top:20px; border-bottom: 2px solid #1d4ed8; padding-bottom:5px;">DATA KEHADIRAN PESERTA</h3>`;
             html += `<table class="print-table">
-                        <thead>
-                            <tr>
-                                <th style="width:30px; text-align:center;">No</th>
-                                <th>Nama Lengkap</th>
-                                <th style="width:50px; text-align:center;">L/P</th>
-                                <th>Kelompok</th>
-                                <th>Desa</th>
-                                <th>Keterangan Absen</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th style="width:30px; text-align:center;">No</th><th>Nama Lengkap</th><th style="width:50px; text-align:center;">L/P</th><th>Kelompok</th><th>Desa</th><th>Keterangan Absen</th></tr></thead>
                         <tbody>`;
             if(dataPeserta.length === 0) {
-                html += `<tr><td colspan="6" style="text-align:center; color:#ef4444; padding:10px;">Tidak ada data presensi Peserta.</td></tr>`;
+                html += `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:10px;">Tidak ada data presensi Peserta.</td></tr>`;
             } else {
                 dataPeserta.forEach((d, i) => { 
                     let labelStatusText = d.metode === 'Izin' ? '<span style="color:var(--warning); font-weight:600;">IZIN</span>' : '<span style="color:var(--primary); font-weight:600;">HADIR</span>';
-                    html += `<tr>
-                        <td style="text-align:center;">${i+1}</td><td style="font-weight:600;">${d.name}</td><td style="text-align:center;">${d.jk.includes('PEREMPUAN')?'P':'L'}</td>
-                        <td>${d.kelompok}</td><td>${d.desa}</td><td>Hari Ke-${d.hariKe} — ${labelStatusText} (${d.waktu})</td>
-                    </tr>`; 
+                    html += `<tr><td style="text-align:center;">${i+1}</td><td style="font-weight:600;">${d.name}</td><td style="text-align:center;">${d.jk.includes('PEREMPUAN')?'P':'L'}</td><td>${d.kelompok}</td><td>${d.desa}</td><td>Hari ${d.hariKe} — Sesi ${d.sesi} — ${labelStatusText} (${d.waktu})</td></tr>`; 
                 });
             }
             html += `</tbody></table>`;
         }
 
-        // ================== TABEL PANITIA ==================
         if (filterPeran === "SEMUA" || filterPeran === "PANITIA") {
             html += `<h3 style="margin-top:40px; border-bottom: 2px solid #0369a1; padding-bottom:5px;">DATA KEHADIRAN PANITIA / PENGURUS</h3>`;
             html += `<table class="print-table">
-                        <thead>
-                            <tr>
-                                <th style="width:30px; text-align:center;">No</th>
-                                <th>Nama Lengkap</th>
-                                <th style="width:50px; text-align:center;">L/P</th>
-                                <th>Kelompok</th>
-                                <th>Desa</th>
-                                <th>Keterangan Absen</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th style="width:30px; text-align:center;">No</th><th>Nama Lengkap</th><th style="width:50px; text-align:center;">L/P</th><th>Kelompok</th><th>Desa</th><th>Keterangan Absen</th></tr></thead>
                         <tbody>`;
             if(dataPanitia.length === 0) {
-                html += `<tr><td colspan="6" style="text-align:center; color:#ef4444; padding:10px;">Tidak ada data presensi Panitia.</td></tr>`;
+                html += `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:10px;">Tidak ada data presensi Panitia.</td></tr>`;
             } else {
                 dataPanitia.forEach((d, i) => { 
                     let labelStatusText = d.metode === 'Izin' ? '<span style="color:var(--warning); font-weight:600;">IZIN</span>' : '<span style="color:var(--primary); font-weight:600;">HADIR</span>';
-                    html += `<tr>
-                        <td style="text-align:center;">${i+1}</td><td style="font-weight:600;">${d.name}</td><td style="text-align:center;">${d.jk.includes('PEREMPUAN')?'P':'L'}</td>
-                        <td>${d.kelompok}</td><td>${d.desa}</td><td>Hari Ke-${d.hariKe} — ${labelStatusText} (${d.waktu})</td>
-                    </tr>`; 
+                    html += `<tr><td style="text-align:center;">${i+1}</td><td style="font-weight:600;">${d.name}</td><td style="text-align:center;">${d.jk.includes('PEREMPUAN')?'P':'L'}</td><td>${d.kelompok}</td><td>${d.desa}</td><td>Hari ${d.hariKe} — Sesi ${d.sesi} — ${labelStatusText} (${d.waktu})</td></tr>`; 
                 });
             }
             html += `</tbody></table>`;
         }
-
-        container.innerHTML = html; 
-        areaCetak.style.display = "block";
+        container.innerHTML = html; areaCetak.style.display = "block";
     }
 
     async function tarikRekapTotalLangsung() {
@@ -806,69 +815,78 @@
         
         let localLogs = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
         let gabunganSemua = [...logAbsen, ...localLogs];
+        
         let mapUnik = new Map();
         gabunganSemua.forEach(item => { 
             let key = (item.id_peserta || item.id_generus) + "_" + item.created_at; 
             mapUnik.set(key, item); 
         }); 
         
-        gabunganSemua.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-        let listTanggalUnik = [...new Set(gabunganSemua.map(l => new Date(l.created_at).toDateString()))];
+        let logTerfilterFix = Array.from(mapUnik.values());
+        logTerfilterFix.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
 
-        dataMentahTahunanLog = Array.from(mapUnik.values()).map(log => {
-            let tStr = new Date(log.created_at).toDateString();
-            let nHari = listTanggalUnik.indexOf(tStr) + 1;
-            return { ...log, hariKe: nHari };
+        let container = document.getElementById('print-table-container');
+        let areaCetak = document.getElementById('print-area');
+
+        if(logTerfilterFix.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding:40px; font-weight:700; color:var(--text-muted);">BELUM ADA DATA SCAN MASUK. ACARA BELUM DIMULAI.</div>`;
+            areaCetak.style.display = "block";
+            return;
+        }
+
+        dataMentahTahunanLog = logTerfilterFix.map(log => {
+            let tStr = new Date(log.created_at);
+            let nHari = dapatkanHariKeBerdasarkanLog(tStr, logTerfilterFix);
+            let sLog = log.catatan_sesi || hitungSesiBerdasarkanWaktu(tStr.getHours());
+            return { ...log, hariKe: nHari, sesi: sLog };
         });
         
         const filterPeran = document.getElementById('filter-rekap-peran').value;
-        
-        // PERUBAHAN DI SINI: Tidak lagi menyaring berdasarkan listIdTerabsen agar semua yang terdaftar muncul
         dataMasterTahunanOrang = semuaDataGenerus.filter(g => {
-            // Menyaring status peran pada rekap total full acara
             let peranUser = "PESERTA";
             if (g.status) {
                 let st = g.status.toUpperCase();
                 if (st === "PANITIA" || st === "PENGURUS") peranUser = "PANITIA";
             }
             if (filterPeran !== "SEMUA" && peranUser !== filterPeran) return false;
-            
             return true;
         }); 
-
-        if(dataMasterTahunanOrang.length === 0) {
-            return tampilkanNotifKustom('error', 'Kosong', 'Belum ada data anggota dengan peran ini.');
-        }
 
         dataMasterTahunanOrang.sort((a,b) => (a.nama_lengkap || '').localeCompare(b.nama_lengkap)); 
 
         const txtPeran = document.getElementById('filter-rekap-peran').options[document.getElementById('filter-rekap-peran').selectedIndex].text;
-        document.getElementById('cetak-judul-kegiatan').innerText = `REKAP TOTAL PRESENSI FULL ACARA (${txtPeran})`;
-        document.getElementById('cetak-waktu').innerText = `Cetak: ` + new Date().toLocaleString('id-ID');
+        document.getElementById('cetak-judul-kegiatan').innerText = `REKAP TOTAL FULL ACARA 3 HARI TIMELINE DINAMIS (${txtPeran})`;
+        document.getElementById('cetak-waktu').innerText = `Acara Dimulai: ${new Date(logTerfilterFix[0].created_at).toLocaleDateString('id-ID')} | Cetak: ` + new Date().toLocaleString('id-ID');
         document.getElementById('resume-kehadiran-container').innerHTML = "";
 
-        let container = document.getElementById('print-table-container');
-        let areaCetak = document.getElementById('print-area');
-
         let headerHariHtml = "";
-        for (let h = 1; h <= 10; h++) { headerHariHtml += `<th style="text-align:center; width:28px; font-size:10px;">H${h}</th>`; }
+        for (let h = 1; h <= 3; h++) { 
+            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0; border-left:2px solid #64748b;">H${h}-Pg</th>`; 
+            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0;">H${h}-Sg</th>`; 
+            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0; border-right:2px solid #64748b;">H${h}-Ml</th>`; 
+        }
 
         let html = `<table class="print-table">
                     <thead>
                         <tr>
-                            <th style="width:30px; text-align:center;">No</th>
-                            <th>Nama Lengkap</th>
-                            <th>Kelompok</th>
-                            <th>Desa</th>
-                            ${headerHariHtml}
-                            <th style="text-align:center; width:40px; background:#f1f5f9; font-weight:700;">Hdr</th>
-                            <th style="text-align:center; width:40px; background:#fff5f5; font-weight:700;">Izn</th>
+                            <th style="width:25px; text-align:center;" rowspan="2">No</th>
+                            <th rowspan="2">Nama Lengkap</th>
+                            <th rowspan="2">Kelompok</th>
+                            <th rowspan="2">Desa</th>
+                            <th style="text-align:center;" colspan="9">Kehadiran Sesi</th>
+                            <th style="text-align:center; width:35px; background:#f1f5f9; font-weight:700;" rowspan="2">Hdr</th>
+                            <th style="text-align:center; width:35px; background:#fff5f5; font-weight:700;" rowspan="2">Izn</th>
                         </tr>
+                        <tr>${headerHariHtml}</tr>
                     </thead>
                     <tbody>`;
 
+        const daftarSesiArr = ["PAGI", "SIANG", "MALAM"];
+
         dataMasterTahunanOrang.forEach((orang, idx) => {
             let logOrang = dataMentahTahunanLog.filter(l => String(l.id_peserta || l.id_generus) === String(orang.id_generus)); 
+            let pernahHadirHari1 = logOrang.some(l => l.hariKe === 1 && l.metode_input !== 'Izin');
+
             html += `<tr>
                         <td style="text-align:center;">${idx + 1}</td>
                         <td style="font-weight:600;">${orang.nama_lengkap}</td> 
@@ -876,13 +894,30 @@
                         <td>${(orang.desa || "-").toUpperCase()}</td>`;
             
             let totalHadir = 0; let totalIzin = 0;
-            for (let h = 1; h <= 10; h++) {
-                let hadir = logOrang.some(l => l.hariKe === h && l.metode_input !== 'Izin');
-                let izin = logOrang.some(l => l.hariKe === h && l.metode_input === 'Izin');
-                
-                if (hadir) { html += `<td style="text-align:center; color:#1d4ed8; font-weight:700;">✔</td>`; totalHadir++; }
-                else if (izin) { html += `<td style="text-align:center; color:#0284c7; font-weight:700; font-size:8px;">IZN</td>`; totalIzin++; }
-                else { html += `<td style="text-align:center; color:#cbd5e1;">-</td>`; }
+
+            for (let h = 1; h <= 3; h++) {
+                daftarSesiArr.forEach(sNama => {
+                    let borderKiriStyle = (sNama === "PAGI") ? "border-left:2px solid #cbd5e1;" : "";
+                    let borderKananStyle = (sNama === "MALAM") ? "border-right:2px solid #cbd5e1;" : "";
+                    let styleCombine = borderKiriStyle + borderKananStyle;
+
+                    if (h > 1 && !pernahHadirHari1) {
+                        html += `<td style="text-align:center; color:#cbd5e1;" class="disabled-print-cell" style="${styleCombine}">-</td>`; 
+                    } else {
+                        let hadir = logOrang.some(l => l.hariKe === h && l.sesi === sNama && l.metode_input !== 'Izin');
+                        let izin = logOrang.some(l => l.hariKe === h && l.sesi === sNama && l.metode_input === 'Izin');
+
+                        if (hadir) { 
+                            html += `<td style="text-align:center; color:#1d4ed8; font-weight:700; ${styleCombine}">✔</td>`; 
+                            totalHadir++; 
+                        } else if (izin) { 
+                            html += `<td style="text-align:center; color:#0284c7; font-weight:700; font-size:8px; ${styleCombine}">IZN</td>`; 
+                            totalIzin++; 
+                        } else { 
+                            html += `<td style="text-align:center; color:#cbd5e1; ${styleCombine}">-</td>`; 
+                        }
+                    }
+                });
             }
             html += `<td style="text-align:center; font-weight:700; background:#f8fafc; color:#1d4ed8;">${totalHadir}</td>
                      <td style="text-align:center; font-weight:700; background:#fff5f5; color:#b91c1c;">${totalIzin}</td></tr>`;
@@ -899,16 +934,17 @@
     }
 
     async function printSemuaOtomatis() {
-        await tarikDanCetakLaporan('semua', false);
+        await tarikRekapTotalLangsung();
         setTimeout(() => { window.print(); }, 500);
     }
 
     async function eksporKeExcel() {
         let dataMurni = await dapatkanDataGabungan();
-        let csv = "No,Nama Lengkap,Kelompok,Desa,Peran,Hari Ke,Waktu,Metode\n";
-        dataMurni.forEach((d, i) => { csv += `${i+1},"${d.name}","${d.kelompok}","${d.desa}","${d.status}",Hari Ke-${d.hariKe},"${d.waktu}","${d.metode}"\n`; });
+        if(dataMurni.length === 0) return tampilkanNotifKustom('error', 'Kosong', 'Tidak ada data untuk diekspor.');
+        let csv = "No,Nama Lengkap,Kelompok,Desa,Peran,Hari Ke,Sesi,Waktu,Metode\n";
+        dataMurni.forEach((d, i) => { csv += `${i+1},"${d.name}","${d.kelompok}","${d.desa}","${d.status}",Hari Ke-${d.hariKe},"${d.sesi}","${d.waktu}","${d.metode}"\n`; });
         let blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-        let link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `REKAP_PERMATA_CAI.csv`; link.click();
+        let link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `REKAP_PERMATA_CAI_DINAMIS.csv`; link.click();
     }
 
     updateStatusInternet();
