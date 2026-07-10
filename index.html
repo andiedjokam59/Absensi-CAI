@@ -490,13 +490,11 @@
     let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 220 });
     html5QrcodeScanner.render(onScanSuccess);
 
-    // LOGIKA DINAMIS: Menghitung index Hari Ke- (1, 2, atau 3) berdasarkan log pertama yang pernah ada
     function dapatkanHariKeBerdasarkanLog(waktuSekarang, seluruhLog) {
         if (!seluruhLog || seluruhLog.length === 0) {
-            return 1; // Jika benar-benar kosong, ini adalah scan pertama (Hari Ke-1)
+            return 1; 
         }
         
-        // Cari timestamp paling awal dari seluruh data sebagai benchmark dimulainya acara
         let salinanLog = [...seluruhLog].filter(l => l.created_at);
         salinanLog.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         
@@ -504,7 +502,6 @@
 
         let waktuPertamaMulai = new Date(salinanLog[0].created_at);
         
-        // Reset jam ke 00:00 untuk murni membandingkan selisih kalender hari
         let d1 = new Date(waktuPertamaMulai.getFullYear(), waktuPertamaMulai.getMonth(), waktuPertamaMulai.getDate());
         let d2 = new Date(waktuSekarang.getFullYear(), waktuSekarang.getMonth(), waktuSekarang.getDate());
         
@@ -526,15 +523,16 @@
         
         if (navigator.onLine) {
             try {
-                let { data: cloudLogs } = await _supabase.from('absensi_cai').select('created_at, catatan_sesi, id_peserta'); 
+                let { data: cloudLogs, error: fetchError } = await _supabase.from('absensi_cai').select('created_at, catatan_sesi, id_peserta'); 
+                if (fetchError) console.error("Gagal mengambil log dari cloud:", fetchError);
                 if (cloudLogs) riwayatGabungan = riwayatGabungan.concat(cloudLogs);
-            } catch(e) {}
+            } catch(e) {
+                console.error("Error jaringan saat fetch log:", e);
+            }
         }
 
-        // Tentukan Hari Ke berapa saat ini berdasarkan timeline data real-time
         let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, riwayatGabungan);
 
-        // Validasi Duplikasi: Cari apakah user ini sudah absen di HARI dan SESI dinamis yang sama
         let logSesiSama = riwayatGabungan.find(l => {
             if(!l.created_at) return false;
             if(String(l.id_peserta || l.id_generus) !== String(idPeserta)) return false;
@@ -552,12 +550,13 @@
             return; 
         }
 
+        // COCOK SUPABASE: Konversi paksa semua value ke String murni agar aman di kolom Text database
         const dataAbsenBaru = { 
-            id_peserta: String(idPeserta),
-            nama: profil.nama_lengkap,
-            kelompok: profil.kelompok,
-            metode_input: metode, 
-            catatan_sesi: sesiSekarang, 
+            id_peserta: String(idPeserta).trim(),
+            nama: String(profil.nama_lengkap || '').trim(),
+            kelompok: String(profil.kelompok || '-').trim(),
+            metode_input: String(metode).trim(), 
+            catatan_sesi: String(sesiSekarang).trim(), 
             created_at: waktuSekarang.toISOString() 
         };
 
@@ -567,15 +566,19 @@
         
         if (navigator.onLine) {
             try {
-                let { error } = await _supabase.from('absensi_cai').insert([dataAbsenBaru]);
-                if (!error) {
+                let { error: insertError } = await _supabase.from('absensi_cai').insert([dataAbsenBaru]);
+                if (!insertError) {
                     let logsSesudahUpload = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
                     logsSesudahUpload.pop(); 
                     localStorage.setItem('absensi_cai_lokal', JSON.stringify(logsSesudahUpload));
                     tampilkanNotifKustom('success', `Hari ${hariKeSekarang} (${sesiSekarang})`, profil.nama_lengkap);
                     return;
+                } else {
+                    console.error("Supabase Menolak Data! Detail Error:", insertError);
                 }
-            } catch (err) {}
+            } catch (err) {
+                console.error("Gagal terhubung ke Supabase (Exception):", err);
+            }
         }
         tampilkanNotifKustom('success', `Lokal H${hariKeSekarang} (${sesiSekarang})`, profil.nama_lengkap + ' [Offline]');
     }
@@ -635,7 +638,7 @@
                 tanggalLengkap: tanggalObj.toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})
             }
         }).filter(d => {
-            if (d.hariKe > 3) return false; // Batasi timeline 3 hari fleksibel
+            if (d.hariKe > 3) return false; 
             if (filterHari !== "SEMUA" && String(d.hariKe) !== filterHari) return false;
             if (filterSesi !== "SEMUA" && d.sesi !== filterSesi) return false;
             if (filterPeran !== "SEMUA" && d.status !== filterPeran) return false;
@@ -653,14 +656,25 @@
 
         for (let i = 0; i < localLogs.length; i++) {
             try {
-                if(localLogs[i].id_generus && !localLogs[i].id_peserta) {
-                    localLogs[i].id_peserta = String(localLogs[i].id_generus);
-                    delete localLogs[i].id_generus;
+                let item = localLogs[i];
+                let dataClean = {
+                    id_peserta: String(item.id_peserta || item.id_generus || '').trim(),
+                    nama: String(item.nama || '').trim(),
+                    kelompok: String(item.kelompok || '-').trim(),
+                    metode_input: String(item.metode_input || 'Manual').trim(),
+                    catatan_sesi: String(item.catatan_sesi || 'PAGI').trim(),
+                    created_at: item.created_at
+                };
+
+                let { error: syncError } = await _supabase.from('absensi_cai').insert([dataClean]);
+                if (!syncError) {
+                    berhasilUploadCount++;
+                } else {
+                    console.error("Gagal sinkronisasi baris data:", syncError);
+                    logsSisaGagal.push(item);
                 }
-                let { error } = await _supabase.from('absensi_cai').insert([localLogs[i]]);
-                if (!error) berhasilUploadCount++;
-                else logsSisaGagal.push(localLogs[i]);
             } catch (e) {
+                console.error("Error exception saat sinkronisasi:", e);
                 logsSisaGagal.push(localLogs[i]);
             }
         }
