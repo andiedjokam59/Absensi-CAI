@@ -249,11 +249,106 @@
 
         .disabled-print-cell { background-color: #f1f5f9 !important; color: #cbd5e1 !important; }
 
+        /* ========================================= */
+        /* STYLE FILTER POPUP ALA EXCEL              */
+        /* ========================================= */
+        .th-filterable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        .th-filterable:hover {
+            background-color: #e2e8f0;
+        }
+        .filter-icon {
+            display: inline-block;
+            margin-left: 4px;
+            font-size: 10px;
+            color: #64748b;
+        }
+        .filter-icon.active {
+            color: #1d4ed8;
+            font-weight: bold;
+        }
+        .excel-filter-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+            padding: 10px;
+            z-index: 10000;
+            width: 180px;
+            max-height: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: normal;
+            color: #0f172a;
+            text-transform: none;
+        }
+        .excel-filter-search {
+            width: 100%;
+            padding: 4px 8px;
+            font-size: 11px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .excel-filter-list {
+            overflow-y: auto;
+            max-height: 140px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin: 4px 0;
+            border: 1px solid #f1f5f9;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .excel-filter-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .excel-filter-item input {
+            width: auto !important;
+            margin: 0;
+            cursor: pointer;
+        }
+        .excel-filter-actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+        }
+        .excel-filter-btn {
+            flex: 1;
+            padding: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            cursor: pointer;
+            text-align: center;
+        }
+        .excel-filter-btn.primary {
+            background: #1d4ed8;
+            color: #ffffff;
+            border: none;
+        }
+
         @media print {
             body { background: #fff!important; color: #000!important; display: block; }
             .app-container { max-width: 100%; width: 100%; box-shadow: none!important; padding: 0; margin: 0; }
-            .top-bar, .section-title, #reader, .divider, .form-group, .btn-primary, .btn-warning, .action-row, .search-results, .scan-notif-modal, .filter-backdrop-overlay { display: none!important; }
+            .top-bar, .section-title, #reader, .divider, .form-group, .btn-primary, .btn-warning, .action-row, .search-results, .scan-notif-modal, .filter-backdrop-overlay, .excel-filter-menu { display: none!important; }
             #print-area { display: block!important; }
+            .filter-icon { display: none !important; }
         }
     </style>
 </head>
@@ -337,7 +432,7 @@
             Desa
         </button>
         <button class="btn-icon" onclick="tarikDanCetakLaporan('kelompok')" title="Rekap Kelompok">
-            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 1 0 7.75"></path></svg>
             Klp
         </button>
         <button class="btn-icon" onclick="sinkronisasiManual()" title="Simpan Cloud">
@@ -407,6 +502,11 @@
     let pengunciScanAktif = false; 
     let globalAudioCtx = null;
     let toastTimeout = null;
+
+    // STATE UNTUK FILTER STYLE EXCEL
+    let selectedKelompokFilter = [];
+    let selectedDesaFilter = [];
+    let activeFilterMenu = null;
 
     function bukaKunciAudioKonstruktor() {
         if (!globalAudioCtx) { globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -555,25 +655,21 @@
     }
     let html5QrcodeScanner = null;
 
-    // Fungsi untuk menghidupkan kamera
     function hidupkanKamera() {
         if (!html5QrcodeScanner) {
             html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 220 });
             html5QrcodeScanner.render(onScanSuccess);
             
-            // Atur tampilan tombol
             document.getElementById('btn-hidupkan').style.display = 'none';
             document.getElementById('btn-matikan').style.display = 'block';
         }
     }
 
-    // Fungsi untuk mematikan kamera
     function matikanKamera() {
         if (html5QrcodeScanner) {
             html5QrcodeScanner.clear().then(() => {
-                html5QrcodeScanner = null; // Reset scanner
+                html5QrcodeScanner = null; 
                 
-                // Atur tampilan tombol kembali seperti semula
                 document.getElementById('btn-hidupkan').style.display = 'block';
                 document.getElementById('btn-matikan').style.display = 'none';
             }).catch(error => {
@@ -613,7 +709,6 @@
         
         let localLogs = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
         
-        // Ambil data Cloud juga agar validasi offline/online tetap sinkron
         let cloudLogs = [];
         if (navigator.onLine) {
             try {
@@ -625,9 +720,7 @@
         let riwayatGabungan = [...cloudLogs, ...localLogs];
         let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, riwayatGabungan);
 
-        // =========================================================
-        // FITUR CEK DOBEL SCAN SESI PER HARI (PENCEGAHAN DUPLIKASI)
-        // =========================================================
+        // FITUR CEK DOBEL SCAN SESI PER HARI
         let sudahAbsenDiSesiIni = riwayatGabungan.some(log => {
             let logId = String(log.id_peserta || log.id_generus).trim();
             if (logId !== String(idPeserta).trim()) return false;
@@ -701,7 +794,6 @@
         });
         let logTerfilterFix = Array.from(mapUnik.values());
         
-        // Selalu urutkan berdasarkan waktu absen (paling awal ke paling akhir)
         logTerfilterFix.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
 
         const filterHari = document.getElementById('filter-rekap-hari').value;
@@ -965,7 +1057,6 @@
             return true;
         }); 
 
-        // Diurutkan berdasarkan KELOMPOK, lalu NAMA LENGKAP
         dataMasterTahunanOrang.sort((a, b) => {
             let klpA = (a.kelompok || '').toUpperCase();
             let klpB = (b.kelompok || '').toUpperCase();
@@ -975,10 +1066,40 @@
             return (a.nama_lengkap || '').localeCompare(b.nama_lengkap);
         }); 
 
+        // Inisialisasi awal nilai unik filter jika masih kosong
+        let listSemuaKelompok = [...new Set(dataMasterTahunanOrang.map(g => (g.kelompok || '-').toUpperCase()))].sort();
+        let listSemuaDesa = [...new Set(dataMasterTahunanOrang.map(g => (g.desa || '-').toUpperCase()))].sort();
+
+        if (selectedKelompokFilter.length === 0) selectedKelompokFilter = [...listSemuaKelompok];
+        if (selectedDesaFilter.length === 0) selectedDesaFilter = [...listSemuaDesa];
+
+        renderRekapTotalDenganFilter(logTerfilterFix);
+    }
+
+    // =========================================================
+    // RENDER TABEL DENGAN FILTER EXCEL
+    // =========================================================
+    function renderRekapTotalDenganFilter(logTerfilterFix) {
+        let container = document.getElementById('print-table-container');
+        let areaCetak = document.getElementById('print-area');
+
         const txtPeran = document.getElementById('filter-rekap-peran').options[document.getElementById('filter-rekap-peran').selectedIndex].text;
         document.getElementById('cetak-judul-kegiatan').innerText = `REKAP TOTAL FULL ACARA 3 HARI TIMELINE DINAMIS (${txtPeran})`;
         document.getElementById('cetak-waktu').innerText = `Acara Dimulai: ${new Date(logTerfilterFix[0].created_at).toLocaleDateString('id-ID')} | Cetak: ` + new Date().toLocaleString('id-ID');
         document.getElementById('resume-kehadiran-container').innerHTML = "";
+
+        // Terapkan Filter Excel
+        let orangTerfilter = dataMasterTahunanOrang.filter(orang => {
+            let kName = (orang.kelompok || '-').toUpperCase();
+            let dName = (orang.desa || '-').toUpperCase();
+            return selectedKelompokFilter.includes(kName) && selectedDesaFilter.includes(dName);
+        });
+
+        let listSemuaKelompok = [...new Set(dataMasterTahunanOrang.map(g => (g.kelompok || '-').toUpperCase()))].sort();
+        let listSemuaDesa = [...new Set(dataMasterTahunanOrang.map(g => (g.desa || '-').toUpperCase()))].sort();
+
+        let isKelompokFiltered = selectedKelompokFilter.length < listSemuaKelompok.length;
+        let isDesaFiltered = selectedDesaFilter.length < listSemuaDesa.length;
 
         let headerHariHtml = "";
         for (let h = 1; h <= 3; h++) { 
@@ -992,8 +1113,19 @@
                         <tr>
                             <th style="width:25px; text-align:center;" rowspan="2">No</th>
                             <th rowspan="2">Nama Lengkap</th>
-                            <th rowspan="2">Kelompok</th>
-                            <th rowspan="2">Desa</th>
+                            
+                            <!-- HEADER FILTER KELOMPOK ALA EXCEL -->
+                            <th rowspan="2" class="th-filterable" onclick="bukaExcelFilterMenu(event, 'kelompok')">
+                                Kelompok 
+                                <span class="filter-icon ${isKelompokFiltered ? 'active' : ''}">${isKelompokFiltered ? '▼ (Filtered)' : '▼'}</span>
+                            </th>
+                            
+                            <!-- HEADER FILTER DESA ALA EXCEL -->
+                            <th rowspan="2" class="th-filterable" onclick="bukaExcelFilterMenu(event, 'desa')">
+                                Desa 
+                                <span class="filter-icon ${isDesaFiltered ? 'active' : ''}">${isDesaFiltered ? '▼ (Filtered)' : '▼'}</span>
+                            </th>
+
                             <th style="text-align:center;" colspan="9">Kehadiran Sesi</th>
                             <th style="text-align:center; width:35px; background:#f1f5f9; font-weight:700;" rowspan="2">Hdr</th>
                             <th style="text-align:center; width:35px; background:#fff5f5; font-weight:700;" rowspan="2">Izn</th>
@@ -1002,14 +1134,17 @@
                     </thead>
                     <tbody>`;
 
+        if (orangTerfilter.length === 0) {
+            html += `<tr><td colspan="15" style="text-align:center; padding:20px; color:var(--text-muted);">Tidak ada data yang sesuai dengan filter.</td></tr>`;
+        }
+
         const daftarSesiArr = ["PAGI", "SIANG", "MALAM"];
-        
         let waktuSekarang = new Date();
         let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, logTerfilterFix);
         let sesiSekarang = hitungSesiBerdasarkanWaktu(waktuSekarang.getHours());
         let indeksSesiSekarang = daftarSesiArr.indexOf(sesiSekarang);
 
-        dataMasterTahunanOrang.forEach((orang, idx) => {
+        orangTerfilter.forEach((orang, idx) => {
             let logOrang = dataMentahTahunanLog.filter(l => String(l.id_peserta || l.id_generus) === String(orang.id_generus)); 
             let pernahHadirHari1 = logOrang.some(l => l.hariKe === 1 && l.metode_input !== 'Izin');
 
@@ -1067,9 +1202,95 @@
         areaCetak.style.display = "block";
     }
 
+    // =========================================================
+    // MEKANISME MENU DROPDOWN FILTER ALA EXCEL
+    // =========================================================
+    function bukaExcelFilterMenu(e, jenisKolom) {
+        e.stopPropagation();
+        tutupSemuaDropdownAman();
+
+        let targetTh = e.currentTarget;
+        let allValues = [...new Set(dataMasterTahunanOrang.map(g => (jenisKolom === 'kelompok' ? (g.kelompok || '-') : (g.desa || '-')).toUpperCase()))].sort();
+        let selectedValues = jenisKolom === 'kelompok' ? selectedKelompokFilter : selectedDesaFilter;
+
+        let menu = document.createElement('div');
+        menu.className = 'excel-filter-menu';
+        menu.id = 'excel-filter-popover';
+        
+        let searchInputHtml = `<input type="text" class="excel-filter-search" placeholder="Cari..." oninput="filterDaftarExcelItems(this)">`;
+        
+        let isSelectAllChecked = selectedValues.length === allValues.length;
+        let itemsHtml = `<label class="excel-filter-item">
+                            <input type="checkbox" onchange="toggleSelectAllExcel(this)" ${isSelectAllChecked ? 'checked' : ''}>
+                            <b>(Pilih Semua)</b>
+                         </label>`;
+
+        allValues.forEach(val => {
+            let isChecked = selectedValues.includes(val);
+            itemsHtml += `<label class="excel-filter-item filter-value-option">
+                            <input type="checkbox" value="${val}" class="excel-check-item" ${isChecked ? 'checked' : ''}>
+                            <span>${val}</span>
+                          </label>`;
+        });
+
+        let actionsHtml = `
+            <div class="excel-filter-actions">
+                <button class="excel-filter-btn primary" onclick="terapkanExcelFilter('${jenisKolom}')">OK</button>
+                <button class="excel-filter-btn" onclick="tutupSemuaDropdownAman()">Batal</button>
+            </div>
+        `;
+
+        menu.innerHTML = searchInputHtml + `<div class="excel-filter-list">` + itemsHtml + `</div>` + actionsHtml;
+        targetTh.appendChild(menu);
+        activeFilterMenu = menu;
+        
+        menu.addEventListener('click', (evt) => evt.stopPropagation());
+    }
+
+    function filterDaftarExcelItems(inputEl) {
+        let keyword = inputEl.value.toLowerCase();
+        let options = inputEl.parentElement.querySelectorAll('.filter-value-option');
+        options.forEach(opt => {
+            let txt = opt.innerText.toLowerCase();
+            opt.style.display = txt.includes(keyword) ? 'flex' : 'none';
+        });
+    }
+
+    function toggleSelectAllExcel(masterCb) {
+        let container = masterCb.closest('.excel-filter-menu');
+        let checkboxes = container.querySelectorAll('.excel-check-item');
+        checkboxes.forEach(cb => {
+            if (cb.parentElement.style.display !== 'none') {
+                cb.checked = masterCb.checked;
+            }
+        });
+    }
+
+    function terapkanExcelFilter(jenisKolom) {
+        if (!activeFilterMenu) return;
+
+        let checkboxes = activeFilterMenu.querySelectorAll('.excel-check-item');
+        let selectedArr = [];
+        checkboxes.forEach(cb => {
+            if (cb.checked) selectedArr.push(cb.value);
+        });
+
+        if (jenisKolom === 'kelompok') {
+            selectedKelompokFilter = selectedArr;
+        } else if (jenisKolom === 'desa') {
+            selectedDesaFilter = selectedArr;
+        }
+
+        tutupSemuaDropdownAman();
+        renderRekapTotalDenganFilter(dataMentahTahunanLog);
+    }
+
     function tutupSemuaDropdownAman() {
         resultsBox.style.display = 'none';
         globalOverlay.style.display = 'none';
+        let filterPop = document.getElementById('excel-filter-popover');
+        if (filterPop) filterPop.remove();
+        activeFilterMenu = null;
     }
 
     async function printSemuaOtomatis() {
