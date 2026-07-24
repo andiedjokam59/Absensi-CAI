@@ -606,33 +606,62 @@
     }
 
     async function prosesAbsensi(idPeserta, metode) {
-		let profil = semuaDataGenerus.find(g => String(g.id_generus) === String(idPeserta)) || { nama_lengkap: "ID: " + idPeserta, kelompok: "-" };
-		let waktuSekarang = new Date();
-		let jamSekarang = waktuSekarang.getHours();
-		let sesiSekarang = hitungSesiBerdasarkanWaktu(jamSekarang);
-		
-		let localLogs = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
-		let riwayatGabungan = [...localLogs];
-		
-		let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, riwayatGabungan);
+        let profil = semuaDataGenerus.find(g => String(g.id_generus) === String(idPeserta)) || { nama_lengkap: "ID: " + idPeserta, kelompok: "-" };
+        let waktuSekarang = new Date();
+        let jamSekarang = waktuSekarang.getHours();
+        let sesiSekarang = hitungSesiBerdasarkanWaktu(jamSekarang);
+        
+        let localLogs = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
+        
+        // Ambil data Cloud juga agar validasi offline/online tetap sinkron
+        let cloudLogs = [];
+        if (navigator.onLine) {
+            try {
+                let { data: remoteLogs } = await _supabase.from('absensi_cai').select('*');
+                if (remoteLogs) cloudLogs = remoteLogs;
+            } catch (e) {}
+        }
 
-		bunyikanSuaraSukses();
-		tampilkanNotifKustom('success', `Hari ${hariKeSekarang} (${sesiSekarang})`, profil.nama_lengkap);
+        let riwayatGabungan = [...cloudLogs, ...localLogs];
+        let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, riwayatGabungan);
 
-		const dataAbsenBaru = { 
-			id_peserta: String(idPeserta).trim(),
-			nama: String(profil.nama_lengkap || '').trim(),
-			kelompok: String(profil.kelompok || '-').trim(),
-			metode_input: String(metode).trim(), 
-			catatan_sesi: String(sesiSekarang).trim(), 
-			created_at: waktuSekarang.toISOString() 
-		};
+        // =========================================================
+        // FITUR CEK DOBEL SCAN SESI PER HARI (PENCEGAHAN DUPLIKASI)
+        // =========================================================
+        let sudahAbsenDiSesiIni = riwayatGabungan.some(log => {
+            let logId = String(log.id_peserta || log.id_generus).trim();
+            if (logId !== String(idPeserta).trim()) return false;
 
-		localLogs.push(dataAbsenBaru);
-		localStorage.setItem('absensi_cai_lokal', JSON.stringify(localLogs));
+            let logTime = new Date(log.created_at);
+            let logHari = dapatkanHariKeBerdasarkanLog(logTime, riwayatGabungan);
+            let logSesi = log.catatan_sesi || hitungSesiBerdasarkanWaktu(logTime.getHours());
 
-		kirimDataKeSupabaseBackground(dataAbsenBaru, idPeserta);
-	}
+            return (logHari === hariKeSekarang && logSesi === sesiSekarang);
+        });
+
+        if (sudahAbsenDiSesiIni) {
+            bunyikanSuaraGagal();
+            tampilkanNotifKustom('error', 'Sudah Absen!', `${profil.nama_lengkap} sudah terdata di Hari ${hariKeSekarang} (${sesiSekarang})`);
+            return;
+        }
+
+        bunyikanSuaraSukses();
+        tampilkanNotifKustom('success', `Hari ${hariKeSekarang} (${sesiSekarang})`, profil.nama_lengkap);
+
+        const dataAbsenBaru = { 
+            id_peserta: String(idPeserta).trim(),
+            nama: String(profil.nama_lengkap || '').trim(),
+            kelompok: String(profil.kelompok || '-').trim(),
+            metode_input: String(metode).trim(), 
+            catatan_sesi: String(sesiSekarang).trim(), 
+            created_at: waktuSekarang.toISOString() 
+        };
+
+        localLogs.push(dataAbsenBaru);
+        localStorage.setItem('absensi_cai_lokal', JSON.stringify(localLogs));
+
+        kirimDataKeSupabaseBackground(dataAbsenBaru, idPeserta);
+    }
 
 	async function kirimDataKeSupabaseBackground(dataAbsenBaru, idPeserta) {
 		try {
@@ -672,7 +701,7 @@
         });
         let logTerfilterFix = Array.from(mapUnik.values());
         
-        // PERBAIKAN: Selalu urutkan berdasarkan waktu absen (paling awal ke paling akhir)
+        // Selalu urutkan berdasarkan waktu absen (paling awal ke paling akhir)
         logTerfilterFix.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
 
         const filterHari = document.getElementById('filter-rekap-hari').value;
@@ -705,7 +734,7 @@
                 sesi: sLog,
                 waktu: tanggalObj.toLocaleTimeString('id-ID'),
                 tanggalLengkap: tanggalObj.toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}),
-                rawTime: tanggalObj // disimpan untuk keperluan sorting jika dibutuhkan eksternal
+                rawTime: tanggalObj
             }
         }).filter(d => {
             if (d.hariKe > 3) return false; 
@@ -848,7 +877,6 @@
         let container = document.getElementById('print-table-container');
         let areaCetak = document.getElementById('print-area');
         
-        // Data sudah otomatis terurut berdasarkan waktu absen dari fungsi dapatkanDataGabungan()
         let dataPeserta = dataAktifRekap.filter(d => d.status === 'PESERTA');
         let dataPanitia = dataAktifRekap.filter(d => d.status === 'PANITIA');
 
@@ -976,7 +1004,6 @@
 
         const daftarSesiArr = ["PAGI", "SIANG", "MALAM"];
         
-        // --- LOGIKA DETEKSI WAKTU SEKARANG ---
         let waktuSekarang = new Date();
         let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, logTerfilterFix);
         let sesiSekarang = hitungSesiBerdasarkanWaktu(waktuSekarang.getHours());
@@ -1013,21 +1040,18 @@
                             html += `<td style="text-align:center; color:#0284c7; font-weight:700; font-size:8px; ${styleCombine}">IZN</td>`; 
                             totalIzin++; 
                         } else { 
-                            // --- PENGECEKAN JIKA KETINGGALAN SESI ---
                             let apakahSesiSudahLewat = false;
                             if (h < hariKeSekarang) {
-                                apakahSesiSudahLewat = true; // Hari kemarin sudah pasti lewat
+                                apakahSesiSudahLewat = true; 
                             } else if (h === hariKeSekarang) {
                                 if (sIdx < indeksSesiSekarang) {
-                                    apakahSesiSudahLewat = true; // Sesi di hari yang sama tapi jamnya sudah lewat
+                                    apakahSesiSudahLewat = true; 
                                 }
                             }
 
                             if (apakahSesiSudahLewat) {
-                                // Jika sudah lewat dan kosong, otomatis isi 'X' merah
                                 html += `<td style="text-align:center; color:#ef4444; font-weight:700; ${styleCombine}">X</td>`;
                             } else {
-                                // Jika sesi di masa depan atau sesi yang sedang berjalan sekarang, biarkan strip '-'
                                 html += `<td style="text-align:center; color:#cbd5e1; ${styleCombine}">-</td>`; 
                             }
                         }
