@@ -631,12 +631,31 @@
     }
 
     // =========================================================
-    // PEMBAGIAN SESI DENGAN SESI SIANG SAMPAI JAM 17:59 (SEBELUM 18)
+    // PEMBAGIAN SESI DENGAN SESI SIANG BERAKHIR PADA JAM 16:30
     // =========================================================
-    function hitungSesiBerdasarkanWaktu(jam) {
-        if (jam >= 4 && jam < 11) return "PAGI";
-        else if (jam >= 11 && jam < 18) return "SIANG";
-        else return "MALAM";
+    function hitungSesiBerdasarkanWaktu(waktuObj) {
+        let jam, menit;
+        if (waktuObj instanceof Date) {
+            jam = waktuObj.getHours();
+            menit = waktuObj.getMinutes();
+        } else {
+            jam = waktuObj;
+            menit = 0;
+        }
+        
+        let totalMenit = (jam * 60) + menit;
+
+        let menitPagiAwal = 4 * 60;      // 04:00
+        let menitSiangAwal = 11 * 60;    // 11:00
+        let menitMalamAwal = (16 * 60) + 30; // 16:30
+
+        if (totalMenit >= menitPagiAwal && totalMenit < menitSiangAwal) {
+            return "PAGI";
+        } else if (totalMenit >= menitSiangAwal && totalMenit < menitMalamAwal) {
+            return "SIANG";
+        } else {
+            return "MALAM";
+        }
     }
 
     async function onScanSuccess(decodedText) { 
@@ -695,8 +714,7 @@
     async function prosesAbsensi(idPeserta, metode) {
         let profil = semuaDataGenerus.find(g => String(g.id_generus) === String(idPeserta)) || { nama_lengkap: "ID: " + idPeserta, kelompok: "-" };
         let waktuSekarang = new Date();
-        let jamSekarang = waktuSekarang.getHours();
-        let sesiSekarang = hitungSesiBerdasarkanWaktu(jamSekarang);
+        let sesiSekarang = hitungSesiBerdasarkanWaktu(waktuSekarang);
         
         let localLogs = JSON.parse(localStorage.getItem('absensi_cai_lokal') || '[]');
         
@@ -718,7 +736,7 @@
 
             let logTime = new Date(log.created_at);
             let logHari = dapatkanHariKeBerdasarkanLog(logTime, riwayatGabungan);
-            let logSesi = log.catatan_sesi || hitungSesiBerdasarkanWaktu(logTime.getHours());
+            let logSesi = log.catatan_sesi || hitungSesiBerdasarkanWaktu(logTime);
 
             return (logHari === hariKeSekarang && logSesi === sesiSekarang);
         });
@@ -797,7 +815,7 @@
             let tanggalObj = new Date(absen.created_at);
             
             let nomorHari = dapatkanHariKeBerdasarkanLog(tanggalObj, logTerfilterFix);
-            let sLog = absen.catatan_sesi || hitungSesiBerdasarkanWaktu(tanggalObj.getHours());
+            let sLog = absen.catatan_sesi || hitungSesiBerdasarkanWaktu(tanggalObj);
 
             let peranUser = "PESERTA";
             if (detail && detail.status) {
@@ -1033,7 +1051,7 @@
         dataMentahTahunanLog = logTerfilterFix.map(log => {
             let tStr = new Date(log.created_at);
             let nHari = dapatkanHariKeBerdasarkanLog(tStr, logTerfilterFix);
-            let sLog = log.catatan_sesi || hitungSesiBerdasarkanWaktu(tStr.getHours());
+            let sLog = log.catatan_sesi || hitungSesiBerdasarkanWaktu(tStr);
             return { ...log, hariKe: nHari, sesi: sLog };
         });
         
@@ -1122,7 +1140,7 @@
         const daftarSesiArr = ["PAGI", "SIANG", "MALAM"];
         let waktuSekarang = new Date();
         let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, logTerfilterFix);
-        let sesiSekarang = hitungSesiBerdasarkanWaktu(waktuSekarang.getHours());
+        let sesiSekarang = hitungSesiBerdasarkanWaktu(waktuSekarang);
         let indeksSesiSekarang = daftarSesiArr.indexOf(sesiSekarang);
 
         orangTerfilter.forEach((orang, idx) => {
