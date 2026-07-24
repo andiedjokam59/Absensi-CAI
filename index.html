@@ -249,9 +249,7 @@
 
         .disabled-print-cell { background-color: #f1f5f9 !important; color: #cbd5e1 !important; }
 
-        /* ========================================= */
-        /* STYLE FILTER POPUP ALA EXCEL              */
-        /* ========================================= */
+        /* STYLE FILTER POPUP ALA EXCEL */
         .th-filterable {
             cursor: pointer;
             user-select: none;
@@ -354,13 +352,9 @@
 </head>
 <body onclick="bukaKunciAudioKonstruktor()">
 
-<!-- ==================================================== -->
-<!-- TAMBAHAN HTML CUSTOM SPLASH SCREEN DI AWAL BODY      -->
-<!-- ==================================================== -->
 <div id="splash-screen">
   <img src="cai47.jpeg" alt="Logo CAI Presensi" class="logo-animasi">
 </div>
-<!-- ==================================================== -->
 
 <div id="global-filter-overlay" class="filter-backdrop-overlay" onclick="tutupSemuaDropdownAman()"></div>
 
@@ -378,7 +372,6 @@
 
     <div class="section-title">OPSI 1: SCAN BARCODE</div>
 
-	<!-- Tombol Pengontrol Kamera -->
 	<button id="btn-hidupkan" class="btn-primary" type="button" onclick="hidupkanKamera()">Hidupkan Kamera</button>
 	<button id="btn-matikan" class="btn-warning" type="button" style="display: none;" onclick="matikanKamera()">Matikan Kamera</button>
 	
@@ -432,7 +425,7 @@
             Desa
         </button>
         <button class="btn-icon" onclick="tarikDanCetakLaporan('kelompok')" title="Rekap Kelompok">
-            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 1 0 7.75"></path></svg>
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 1 0 7.75"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
             Klp
         </button>
         <button class="btn-icon" onclick="sinkronisasiManual()" title="Simpan Cloud">
@@ -471,9 +464,6 @@
 </div>
 
 <script>
-    // ====================================================
-    // TAMBAHAN JAVASCRIPT UNTUK MENGHILANGKAN SPLASH SCREEN
-    // ====================================================
     window.addEventListener('load', () => {
         const splashScreen = document.getElementById('splash-screen');
         if(splashScreen) {
@@ -482,7 +472,6 @@
             }, 1800); 
         }
     });
-    // ====================================================
 
     const SUPABASE_URL = "https://gttavghryoadthnvwthd.supabase.co"; 
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0dGF2Z2hyeW9hZHRobnZ3dGhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDI5NDQsImV4cCI6MjA5NjQ3ODk0NH0.0O7I9EqSaiQq8_LKMJS9U-XDuitY6sPfYQVtBsJAeas";
@@ -503,7 +492,6 @@
     let globalAudioCtx = null;
     let toastTimeout = null;
 
-    // STATE UNTUK FILTER STYLE EXCEL
     let selectedKelompokFilter = [];
     let selectedDesaFilter = [];
     let activeFilterMenu = null;
@@ -642,9 +630,12 @@
         }
     }
 
+    // =========================================================
+    // PEMBAGIAN SESI DENGAN SESI SIANG SAMPAI JAM 17:59 (SEBELUM 18)
+    // =========================================================
     function hitungSesiBerdasarkanWaktu(jam) {
         if (jam >= 4 && jam < 11) return "PAGI";
-        else if (jam >= 11 && jam < 16) return "SIANG";
+        else if (jam >= 11 && jam < 18) return "SIANG";
         else return "MALAM";
     }
 
@@ -1066,7 +1057,6 @@
             return (a.nama_lengkap || '').localeCompare(b.nama_lengkap);
         }); 
 
-        // Inisialisasi awal nilai unik filter jika masih kosong
         let listSemuaKelompok = [...new Set(dataMasterTahunanOrang.map(g => (g.kelompok || '-').toUpperCase()))].sort();
         let listSemuaDesa = [...new Set(dataMasterTahunanOrang.map(g => (g.desa || '-').toUpperCase()))].sort();
 
@@ -1076,9 +1066,6 @@
         renderRekapTotalDenganFilter(logTerfilterFix);
     }
 
-    // =========================================================
-    // RENDER TABEL DENGAN FILTER EXCEL
-    // =========================================================
     function renderRekapTotalDenganFilter(logTerfilterFix) {
         let container = document.getElementById('print-table-container');
         let areaCetak = document.getElementById('print-area');
@@ -1088,7 +1075,6 @@
         document.getElementById('cetak-waktu').innerText = `Acara Dimulai: ${new Date(logTerfilterFix[0].created_at).toLocaleDateString('id-ID')} | Cetak: ` + new Date().toLocaleString('id-ID');
         document.getElementById('resume-kehadiran-container').innerHTML = "";
 
-        // Terapkan Filter Excel
         let orangTerfilter = dataMasterTahunanOrang.filter(orang => {
             let kName = (orang.kelompok || '-').toUpperCase();
             let dName = (orang.desa || '-').toUpperCase();
@@ -1113,19 +1099,14 @@
                         <tr>
                             <th style="width:25px; text-align:center;" rowspan="2">No</th>
                             <th rowspan="2">Nama Lengkap</th>
-                            
-                            <!-- HEADER FILTER KELOMPOK ALA EXCEL -->
                             <th rowspan="2" class="th-filterable" onclick="bukaExcelFilterMenu(event, 'kelompok')">
                                 Kelompok 
                                 <span class="filter-icon ${isKelompokFiltered ? 'active' : ''}">${isKelompokFiltered ? '▼ (Filtered)' : '▼'}</span>
                             </th>
-                            
-                            <!-- HEADER FILTER DESA ALA EXCEL -->
                             <th rowspan="2" class="th-filterable" onclick="bukaExcelFilterMenu(event, 'desa')">
                                 Desa 
                                 <span class="filter-icon ${isDesaFiltered ? 'active' : ''}">${isDesaFiltered ? '▼ (Filtered)' : '▼'}</span>
                             </th>
-
                             <th style="text-align:center;" colspan="9">Kehadiran Sesi</th>
                             <th style="text-align:center; width:35px; background:#f1f5f9; font-weight:700;" rowspan="2">Hdr</th>
                             <th style="text-align:center; width:35px; background:#fff5f5; font-weight:700;" rowspan="2">Izn</th>
@@ -1202,9 +1183,6 @@
         areaCetak.style.display = "block";
     }
 
-    // =========================================================
-    // MEKANISME MENU DROPDOWN FILTER ALA EXCEL
-    // =========================================================
     function bukaExcelFilterMenu(e, jenisKolom) {
         e.stopPropagation();
         tutupSemuaDropdownAman();
