@@ -1085,121 +1085,123 @@
     }
 
     function renderRekapTotalDenganFilter(logTerfilterFix) {
-        let container = document.getElementById('print-table-container');
-        let areaCetak = document.getElementById('print-area');
+		let container = document.getElementById('print-table-container');
+		let areaCetak = document.getElementById('print-area');
 
-        const txtPeran = document.getElementById('filter-rekap-peran').options[document.getElementById('filter-rekap-peran').selectedIndex].text;
-        document.getElementById('cetak-judul-kegiatan').innerText = `REKAP TOTAL FULL ACARA 3 HARI TIMELINE DINAMIS (${txtPeran})`;
-        document.getElementById('cetak-waktu').innerText = `Acara Dimulai: ${new Date(logTerfilterFix[0].created_at).toLocaleDateString('id-ID')} | Cetak: ` + new Date().toLocaleString('id-ID');
-        document.getElementById('resume-kehadiran-container').innerHTML = "";
+		const txtPeran = document.getElementById('filter-rekap-peran').options[document.getElementById('filter-rekap-peran').selectedIndex].text;
+		document.getElementById('cetak-judul-kegiatan').innerText = `REKAP TOTAL FULL ACARA 3 HARI TIMELINE DINAMIS (${txtPeran})`;
+		document.getElementById('cetak-waktu').innerText = `Acara Dimulai: ${new Date(logTerfilterFix[0].created_at).toLocaleDateString('id-ID')} | Cetak: ` + new Date().toLocaleString('id-ID');
+		document.getElementById('resume-kehadiran-container').innerHTML = "";
 
-        let orangTerfilter = dataMasterTahunanOrang.filter(orang => {
-            let kName = (orang.kelompok || '-').toUpperCase();
-            let dName = (orang.desa || '-').toUpperCase();
-            return selectedKelompokFilter.includes(kName) && selectedDesaFilter.includes(dName);
-        });
+		let orangTerfilter = dataMasterTahunanOrang.filter(orang => {
+			let kName = (orang.kelompok || '-').toUpperCase();
+			let dName = (orang.desa || '-').toUpperCase();
+			return selectedKelompokFilter.includes(kName) && selectedDesaFilter.includes(dName);
+		});
 
-        let listSemuaKelompok = [...new Set(dataMasterTahunanOrang.map(g => (g.kelompok || '-').toUpperCase()))].sort();
-        let listSemuaDesa = [...new Set(dataMasterTahunanOrang.map(g => (g.desa || '-').toUpperCase()))].sort();
+		let listSemuaKelompok = [...new Set(dataMasterTahunanOrang.map(g => (g.kelompok || '-').toUpperCase()))].sort();
+		let listSemuaDesa = [...new Set(dataMasterTahunanOrang.map(g => (g.desa || '-').toUpperCase()))].sort();
 
-        let isKelompokFiltered = selectedKelompokFilter.length < listSemuaKelompok.length;
-        let isDesaFiltered = selectedDesaFilter.length < listSemuaDesa.length;
+		let isKelompokFiltered = selectedKelompokFilter.length < listSemuaKelompok.length;
+		let isDesaFiltered = selectedDesaFilter.length < listSemuaDesa.length;
 
-        let headerHariHtml = "";
-        for (let h = 1; h <= 3; h++) { 
-            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0; border-left:2px solid #64748b;">H1-Pg</th>`.replace(/H1/g, 'H' + h); 
-            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0;">H1-Sg</th>`.replace(/H1/g, 'H' + h); 
-            headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0; border-right:2px solid #64748b;">H1-Ml</th>`.replace(/H1/g, 'H' + h); 
-        }
+		let headerHariHtml = "";
+		for (let h = 1; h <= 3; h++) { 
+			headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0; border-left:2px solid #64748b;">H${h}-Pg</th>`; 
+			headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0;">H${h}-Sg</th>`; 
+			headerHariHtml += `<th style="text-align:center; font-size:9px; background:#e2e8f0; border-right:2px solid #64748b;">H${h}-Ml</th>`; 
+		}
 
-        let html = `<table class="print-table">
-                    <thead>
-                        <tr>
-                            <th style="width:25px; text-align:center;" rowspan="2">No</th>
-                            <th rowspan="2">Nama Lengkap</th>
-                            <th rowspan="2" class="th-filterable" onclick="bukaExcelFilterMenu(event, 'kelompok')">
-                                Kelompok 
-                                <span class="filter-icon ${isKelompokFiltered ? 'active' : ''}">${isKelompokFiltered ? '▼ (Filtered)' : '▼'}</span>
-                            </th>
-                            <th rowspan="2" class="th-filterable" onclick="bukaExcelFilterMenu(event, 'desa')">
-                                Desa 
-                                <span class="filter-icon ${isDesaFiltered ? 'active' : ''}">${isDesaFiltered ? '▼ (Filtered)' : '▼'}</span>
-                            </th>
-                            <th style="text-align:center;" colspan="9">Kehadiran Sesi</th>
-                            <th style="text-align:center; width:35px; background:#f1f5f9; font-weight:700;" rowspan="2">Hdr</th>
-                            <th style="text-align:center; width:35px; background:#fff5f5; font-weight:700;" rowspan="2">Izn</th>
-                        </tr>
-                        <tr>${headerHariHtml}</tr>
-                    </thead>
-                    <tbody>`;
+		let html = `<table class="print-table">
+					<thead>
+						<tr>
+							<th style="width:25px; text-align:center;" rowspan="2">No</th>
+							<th rowspan="2">Nama Lengkap</th>
+							<th rowspan="2" class="th-filterable" onclick="bukaExcelFilterMenu(event, 'kelompok')">
+								Kelompok 
+								<span class="filter-icon ${isKelompokFiltered ? 'active' : ''}">${isKelompokFiltered ? '▼ (Filtered)' : '▼'}</span>
+							</th>
+							<th rowspan="2" class="th-filterable" onclick="bukaExcelFilterMenu(event, 'desa')">
+								Desa 
+								<span class="filter-icon ${isDesaFiltered ? 'active' : ''}">${isDesaFiltered ? '▼ (Filtered)' : '▼'}</span>
+							</th>
+							<th style="text-align:center;" colspan="9">Kehadiran Sesi</th>
+							<th style="text-align:center; width:35px; background:#f1f5f9; font-weight:700;" rowspan="2">Hdr</th>
+							<th style="text-align:center; width:35px; background:#fff5f5; font-weight:700;" rowspan="2">Izn</th>
+						</tr>
+						<tr>${headerHariHtml}</tr>
+					</thead>
+					<tbody>`;
 
-        if (orangTerfilter.length === 0) {
-            html += `<tr><td colspan="15" style="text-align:center; padding:20px; color:var(--text-muted);">Tidak ada data yang sesuai dengan filter.</td></tr>`;
-        }
+		if (orangTerfilter.length === 0) {
+			html += `<tr><td colspan="15" style="text-align:center; padding:20px; color:var(--text-muted);">Tidak ada data yang sesuai dengan filter.</td></tr>`;
+		}
 
-        const daftarSesiArr = ["PAGI", "SIANG", "MALAM"];
-        let waktuSekarang = new Date();
-        let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, logTerfilterFix);
-        let sesiSekarang = hitungSesiBerdasarkanWaktu(waktuSekarang);
-        let indeksSesiSekarang = daftarSesiArr.indexOf(sesiSekarang);
+		const daftarSesiArr = ["PAGI", "SIANG", "MALAM"];
+		let waktuSekarang = new Date();
+		let hariKeSekarang = dapatkanHariKeBerdasarkanLog(waktuSekarang, logTerfilterFix);
+		let sesiSekarang = hitungSesiBerdasarkanWaktu(waktuSekarang);
+		let indeksSesiSekarang = daftarSesiArr.indexOf(sesiSekarang);
 
-        orangTerfilter.forEach((orang, idx) => {
-            let logOrang = dataMentahTahunanLog.filter(l => String(l.id_peserta || l.id_generus) === String(orang.id_generus)); 
-            let pernahHadirHari1 = logOrang.some(l => l.hariKe === 1 && l.metode_input !== 'Izin');
+		orangTerfilter.forEach((orang, idx) => {
+			// PERBAIKAN 1: Normalisasi ID (menghindari mismatch karena spasi/tipe data)
+			let idMasterTarget = String(orang.id_generus || '').trim();
+			let logOrang = dataMentahTahunanLog.filter(l => {
+				let idLog = String(l.id_peserta || l.id_generus || '').trim();
+				return idLog === idMasterTarget;
+			});
 
-            html += `<tr>
-                        <td style="text-align:center;">${idx + 1}</td>
-                        <td style="font-weight:600;">${orang.nama_lengkap}</td> 
-                        <td>${(orang.kelompok || "-").toUpperCase()}</td>
-                        <td>${(orang.desa || "-").toUpperCase()}</td>`;
-            
-            let totalHadir = 0; let totalIzin = 0;
+			html += `<tr>
+						<td style="text-align:center;">${idx + 1}</td>
+						<td style="font-weight:600;">${orang.nama_lengkap}</td> 
+						<td>${(orang.kelompok || "-").toUpperCase()}</td>
+						<td>${(orang.desa || "-").toUpperCase()}</td>`;
+			
+			let totalHadir = 0; 
+			let totalIzin = 0;
 
-            for (let h = 1; h <= 3; h++) {
-                daftarSesiArr.forEach((sNama, sIdx) => {
-                    let borderKiriStyle = (sNama === "PAGI") ? "border-left:2px solid #cbd5e1;" : "";
-                    let borderKananStyle = (sNama === "MALAM") ? "border-right:2px solid #cbd5e1;" : "";
-                    let styleCombine = borderKiriStyle + borderKananStyle;
+			for (let h = 1; h <= 3; h++) {
+				daftarSesiArr.forEach((sNama, sIdx) => {
+					let borderKiriStyle = (sNama === "PAGI") ? "border-left:2px solid #cbd5e1;" : "";
+					let borderKananStyle = (sNama === "MALAM") ? "border-right:2px solid #cbd5e1;" : "";
+					let styleCombine = borderKiriStyle + borderKananStyle;
 
-                    if (h > 1 && !pernahHadirHari1) {
-                        html += `<td style="text-align:center; color:#cbd5e1;" class="disabled-print-cell" style="${styleCombine}">-</td>`; 
-                    } else {
-                        let hadir = logOrang.some(l => l.hariKe === h && l.sesi === sNama && l.metode_input !== 'Izin');
-                        let izin = logOrang.some(l => l.hariKe === h && l.sesi === sNama && l.metode_input === 'Izin');
+					// PERBAIKAN 2: Pengecekan Murni Per Sesi (Tanpa mengunci Hari 2 & 3)
+					let hadir = logOrang.some(l => Number(l.hariKe) === h && String(l.sesi).toUpperCase() === sNama && l.metode_input !== 'Izin');
+					let izin = logOrang.some(l => Number(l.hariKe) === h && String(l.sesi).toUpperCase() === sNama && l.metode_input === 'Izin');
 
-                        if (hadir) { 
-                            html += `<td style="text-align:center; color:#1d4ed8; font-weight:700; ${styleCombine}">✔</td>`; 
-                            totalHadir++; 
-                        } else if (izin) { 
-                            html += `<td style="text-align:center; color:#0284c7; font-weight:700; font-size:8px; ${styleCombine}">IZN</td>`; 
-                            totalIzin++; 
-                        } else { 
-                            let apakahSesiSudahLewat = false;
-                            if (h < hariKeSekarang) {
-                                apakahSesiSudahLewat = true; 
-                            } else if (h === hariKeSekarang) {
-                                if (sIdx < indeksSesiSekarang) {
-                                    apakahSesiSudahLewat = true; 
-                                }
-                            }
+					if (hadir) { 
+						html += `<td style="text-align:center; color:#1d4ed8; font-weight:700; ${styleCombine}">✔</td>`; 
+						totalHadir++; 
+					} else if (izin) { 
+						html += `<td style="text-align:center; color:#0284c7; font-weight:700; font-size:8px; ${styleCombine}">IZN</td>`; 
+						totalIzin++; 
+					} else { 
+						let apakahSesiSudahLewat = false;
+						if (h < hariKeSekarang) {
+							apakahSesiSudahLewat = true; 
+						} else if (h === hariKeSekarang) {
+							if (sIdx < indeksSesiSekarang) {
+								apakahSesiSudahLewat = true; 
+							}
+						}
 
-                            if (apakahSesiSudahLewat) {
-                                html += `<td style="text-align:center; color:#ef4444; font-weight:700; ${styleCombine}">X</td>`;
-                            } else {
-                                html += `<td style="text-align:center; color:#cbd5e1; ${styleCombine}">-</td>`; 
-                            }
-                        }
-                    }
-                });
-            }
-            html += `<td style="text-align:center; font-weight:700; background:#f8fafc; color:#1d4ed8;">${totalHadir}</td>
-                     <td style="text-align:center; font-weight:700; background:#fff5f5; color:#b91c1c;">${totalIzin}</td></tr>`;
-        });
+						if (apakahSesiSudahLewat) {
+							html += `<td style="text-align:center; color:#ef4444; font-weight:700; ${styleCombine}">X</td>`;
+						} else {
+							html += `<td style="text-align:center; color:#cbd5e1; ${styleCombine}">-</td>`; 
+						}
+					}
+				});
+			}
+			html += `<td style="text-align:center; font-weight:700; background:#f8fafc; color:#1d4ed8;">${totalHadir}</td>
+					 <td style="text-align:center; font-weight:700; background:#fff5f5; color:#b91c1c;">${totalIzin}</td></tr>`;
+		});
 
-        html += `</tbody></table>`;
-        container.innerHTML = html;
-        areaCetak.style.display = "block";
-    }
+		html += `</tbody></table>`;
+		container.innerHTML = html;
+		areaCetak.style.display = "block";
+	}
 
     function bukaExcelFilterMenu(e, jenisKolom) {
         e.stopPropagation();
